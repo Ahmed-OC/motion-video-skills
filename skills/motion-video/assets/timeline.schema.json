@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Motion Video Timeline",
+  "description": "Single source of truth for a code-generated video: visuals, audio and captions all read cue times from here. Validate before rendering; any manual time in scene code is a bug.",
+  "type": "object",
+  "required": ["fps", "duration", "width", "height", "scenes"],
+  "properties": {
+    "fps": { "type": "number", "minimum": 1, "maximum": 120, "description": "Frames per second. All durations derive from this — never animate in milliseconds." },
+    "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Total duration in seconds. durationInFrames = round(duration × fps)." },
+    "width": { "type": "integer", "minimum": 16 },
+    "height": { "type": "integer", "minimum": 16 },
+    "bpm": { "type": "number", "minimum": 40, "maximum": 240, "description": "Declared tempo grid. beat = 60/bpm seconds; bar = 4 beats. Land visual events on this grid instead of detecting tempo." },
+    "palette": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }, "description": "Master palette (hex). index 0 = background convention; last = accent convention." },
+    "fonts": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Role → typeface map, e.g. { display: 'Archivo Black', body: 'Inter' }. Preload before frame 0." },
+    "audio": {
+      "type": "object",
+      "properties": {
+        "music": { "type": ["string", "null"], "description": "'synth' (generate on the bpm grid) | path to a track (analyze with beat_grid.py) | null" },
+        "vo": { "type": ["string", "null"], "description": "Path to voiceover, or null. Generate before animating: narration paces everything." },
+        "sfx": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9_-]+@[0-9]+\\.?[0-9]*$", "description": "name@time cue, e.g. whoosh@2.0" } }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "start", "duration"],
+        "properties": {
+          "id": { "type": "string", "description": "Matches the scene renderer key in the engine code." },
+          "start": { "type": "number", "minimum": 0 },
+          "duration": { "type": "number", "exclusiveMinimum": 0, "description": "3–6s typical; land boundaries on the beat grid." },
+          "text": { "type": "string", "description": "Exact on-screen words (≤ 5 words). Hold ≥ 0.3s/word + 0.5s, min 1.4s." },
+          "device": { "type": "string", "description": "The one visual device this scene executes (e.g. 'word-per-beat pops')." },
+          "palette": { "type": "array", "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }, "description": "Optional per-scene emphasis (color script) — must be a subset/reorder of the master palette." },
+          "cueTimes": { "type": "array", "items": { "type": "number" }, "description": "Absolute times of in-scene events; visuals and audio read the same values." }
+        }
+      }
+    },
+    "captions": {
+      "type": "array",
+      "description": "Word-level caption pages (from TTS timestamps or whisper forced alignment).",
+      "items": {
+        "type": "object",
+        "required": ["startMs", "durationMs", "text"],
+        "properties": {
+          "startMs": { "type": "integer", "minimum": 0 },
+          "durationMs": { "type": "integer", "minimum": 300 },
+          "text": { "type": "string", "maxLength": 60, "description": "1–3 words per pop." },
+          "tokens": {
+            "type": "array",
+            "description": "Per-word windows for pop-in highlighting.",
+            "items": {
+              "type": "object",
+              "required": ["text", "fromMs", "toMs"],
+              "properties": {
+                "text": { "type": "string" },
+                "fromMs": { "type": "integer", "minimum": 0 },
+                "toMs": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "aspect": { "type": "string", "enum": ["16:9", "9:16", "1:1", "21:9", "4:5"] },
+        "style": { "type": "string", "description": "Named style preset from motion-craft.md §7 or a measured custom style." },
+        "language": { "type": "string" }
+      }
+    }
+  }
+}

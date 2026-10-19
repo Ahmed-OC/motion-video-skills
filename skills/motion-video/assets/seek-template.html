@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>seek-template — canvas video starter</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script>
+/* ============================================================================
+   SEEK TEMPLATE — implements the render contract used by scripts/render_frames.mjs
+
+     window.VIDEO        { width, height, fps, duration }
+     window.seek(t)      paints the EXACT frame at time t (seconds) — pure function of t
+     window.renderAudio()→ { mime: 'wav', base64 }  (optional audio stem)
+     window.onReady()    optional async preload hook (fonts/images) before frame 0
+
+   Determinism rules (non-negotiable inside seek/renderAudio):
+     NO requestAnimationFrame · NO setTimeout · NO CSS transitions/animations
+     NO Date.now() · NO Math.random() — use the seeded RNG below.
+     Standalone demo mode: renders even without timeline.json.
+============================================================================ */
+'use strict';
+
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+
+/* ---- seeded RNG: same seed → same film, every render ---- */
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ---- timeline: single source of truth (fetched; demo fallback below) ---- */
+let TL = {
+  fps: 30, width: 1920, height: 1080, duration: 12, bpm: 120,
+  palette: ['#0E0E0E', '#F5F2EA', '#FF4D00'],
+  fonts: { display: 'Archivo Black', body: 'Inter' },
+  scenes: [
+    { id: 'hook',  start: 0, duration: 4, text: 'MOTION IN CODE' },
+    { id: 'build', start: 4, duration: 5, text: '120 BPM GRID' },
+    { id: 'outro', start: 9, duration: 3, text: 'RENDER IT' }
+  ]
+};
+
+/* ---- springs & easing (closed-form: safe to evaluate at any t) ---- */
+function springAt(t, f0, zeta) {
+  if (t <= 0) return 0;
+  const w0 = 2 * Math.PI * f0, wd = w0 * Math.sqrt(1 - zeta * zeta);
+  const s = 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t));
+  return Math.abs(s - 1) < 0.0005 ? 1 : s;           // clamp once sub-pixel
+}
+const SPRINGS = {
+  ui:      (t) => springAt(t, 3.2, 0.55),            // snappy, slight overshoot
+  bigType: (t) => springAt(t, 2.6, 0.9),             // hero type, no visible bounce
+  decor:   (t) => springAt(t, 1.2, 0.7),             // slow drift
+  soft:    (t) => springAt(t, 2.5, 1.0)              // critically damped (cameras/cursors)
+};
+const easeOutExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+/* ---- grain (pre-baked seeded noise tile) & cached vignette ---- */
+const grainTile = (() => {
+  const g = document.createElement('canvas'); g.width = g.height = 96;
+  const gc = g.getContext('2d'), id = gc.createImageData(96, 96), r = mulberry32(1234);
+  for (let i = 0; i < id.data.length; i += 4) {
+    const v = r() * 255 | 0;
+    id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255;
+  }
+  gc.putImageData(id, 0, 0); return g;
+})();
+let vignetteGrad = null;
+
+/* ============================================================================
+   SCENES — each renderer is a pure function of (ctx, u). u = {
+     t: global time · lt: local scene time · p: scene progress 0..1
+     W, H · PAL · beat: seconds per beat · pulse: 1 at each beat, exponential decay
+     sc: the timeline scene object }
+============================================================================ */
+const SCENES = {
+
+  /* hook — words pop one per beat, last word in accent color */
+  hook(c, u) {
+    const words = u.sc.text.split(/\s+/);
+    const size = Math.min(u.W * 0.115, u.H * 0.14);
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = `900 ${size}px ${u.TL.fonts.display}, Impact, sans-serif`;
+    const x = u.W / 2;
+    let y = u.H / 2 - ((words.length - 1) * size * 1.18) / 2;
+    words.forEach((w, i) => {
+      const at = i * u.beat;                          // word i lands on beat i
+      if (u.lt >= at) {
+        const s = SPRINGS.bigType(u.lt - at);
+        const breathe = 1 + 0.008 * Math.sin(u.t * 2 * Math.PI * 0.8);  // idle breathing
+        c.save();
+        c.globalAlpha = clamp01((u.lt - at) * 6);
+        c.translate(x, y);
+        c.scale((0.92 + 0.08 * s) * breathe, (0.92 + 0.08 * s) * breathe);
+        c.fillStyle = i === words.length - 1 ? u.PAL[2] : u.PAL[1];
+        c.fillText(w, 0, 0);
+        c.restore();
+      }
+      y += size * 1.18;
+    });
+  },
+
+  /* build — staggered bar grid fills + rolling counter */
+  build(c, u) {
+    const cols = 12, rows = 5, gap = u.W * 0.004;
+    const gw = u.W * 0.62, x0 = (u.W - gw) / 2, y0 = u.H * 0.62;
+    const cw = (gw - (cols - 1) * gap) / cols, ch = u.H * 0.05;
+    for (let i = 0; i < cols; i++) {
+      const at = i * 0.12;                            // 3–6 frame stagger ≈ 0.12s
+      const s = u.lt >= at ? SPRINGS.ui(u.lt - at) : 0;
+      for (let j = 0; j < rows; j++) {
+        const filled = j / rows < s;
+        c.fillStyle = filled ? (i === cols - 1 ? u.PAL[2] : u.PAL[1]) : u.PAL[1] + '22';
+        c.fillRect(x0 + i * (cw + gap), y0 + j * (ch + gap), cw, ch);
+      }
+    }
+    const count = Math.round(easeOutExpo(clamp01(u.lt / (u.sc.duration - 0.5))) * 100);
+    c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    c.font = `900 ${u.H * 0.13}px ${u.TL.fonts.display}, Impact, sans-serif`;
+    c.fillStyle = u.PAL[1];
+    c.fillText(`${count}%`, u.W / 2, u.H * 0.42);
+    c.font = `500 ${u.H * 0.032}px ${u.TL.fonts.body || 'sans-serif'}`;
+    c.fillStyle = u.PAL[1] + '99';
+    c.fillText(u.sc.text, u.W / 2, u.H * 0.48);
+  },
+
+  /* outro — hard cut, spring-scaled statement, underline sweep, long hold */
+  outro(c, u) {
+    const s = SPRINGS.bigType(u.lt);
+    const size = Math.min(u.W * 0.14, u.H * 0.16);
+    c.save();
+    c.translate(u.W / 2, u.H / 2);
+    c.scale(0.9 + 0.1 * s, 0.9 + 0.1 * s);
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = `900 ${size}px ${u.TL.fonts.display}, Impact, sans-serif`;
+    c.fillStyle = u.PAL[2];
+    c.fillText(u.sc.text, 0, 0);
+    const lw = (Math.min(u.W * 0.3, size * 4)) * easeOutExpo(clamp01(u.lt / 0.6));
+    c.fillStyle = u.PAL[1];
+    c.fillRect(-lw / 2, size * 0.75, lw, Math.max(3, u.H * 0.004));
+    c.restore();
+  },
+
+  default(c, u) { SCENES.hook(c, u); }
+};
+
+/* ============================================================================
+   THE CONTRACT
+============================================================================ */
+let VIDEO = { width: 1920, height: 1080, fps: 30, duration: 15 };
+
+window.seek = function seek(t) {
+  const W = VIDEO.width, H = VIDEO.height;
+  const PAL = TL.palette;
+  const beat = 60 / (TL.bpm || 120);
+  const pulse = Math.exp(-((t / beat) % 1) * 6);      // 1 on each beat, fast decay
+
+  // layer 1 — background (flat + subtle beat pulse, never a random gradient)
+  ctx.fillStyle = PAL[0];
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = PAL[2];
+  ctx.globalAlpha = 0.04 * pulse;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1;
+
+  // layer 2+3 — active scenes (hard cuts are the default transition)
+  for (const sc of TL.scenes) {
+    if (t >= sc.start && t < sc.start + sc.duration) {
+      (SCENES[sc.id] || SCENES.default)(ctx, {
+        t, lt: t - sc.start, p: (t - sc.start) / sc.duration,
+        W, H, PAL, TL, beat, pulse, sc
+      });
+    }
+  }
+
+  // layers 4/5 — vignette + grain (the "designed" finish)
+  if (!vignetteGrad) {
+    vignetteGrad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.42,
+                                            W / 2, H / 2, Math.max(W, H) * 0.75);
+    vignetteGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    vignetteGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
+  }
+  ctx.fillStyle = vignetteGrad;
+  ctx.fillRect(0, 0, W, H);
+  const jitter = (Math.floor(t * VIDEO.fps) * 137) % 96;   // deterministic per frame
+  ctx.save();
+  ctx.globalAlpha = 0.035;
+  for (let x = -96 + jitter; x < W; x += 96)
+    for (let y = -jitter; y < H; y += 96) ctx.drawImage(grainTile, x, y);
+  ctx.restore();
+};
+
+/* ---- audio stem: synth locked to the same BPM grid (kick on downbeats, offbeat hats, low pad) ---- */
+window.renderAudio = async function renderAudio() {
+  const sr = 44100, beat = 60 / (TL.bpm || 120);
+  const bars = Math.ceil(TL.duration / (4 * beat));
+  const off = new OfflineAudioContext(2, Math.ceil(sr * TL.duration), sr);
+  const master = off.createGain(); master.gain.value = 0.9; master.connect(off.destination);
+  const kick = (t) => {
+    const o = off.createOscillator(), g = off.createGain();
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+    g.gain.setValueAtTime(0.9, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    o.connect(g).connect(master); o.start(t); o.stop(t + 0.3);
+  };
+  const hat = (t) => {
+    const b = off.createBuffer(1, sr * 0.05, sr), d = b.getChannelData(0);
+    const r = mulberry32(Math.floor(t * 1000));            // seeded — deterministic audio
+    for (let i = 0; i < d.length; i++) d[i] = (r() * 2 - 1) * (1 - i / d.length);
+    const s = off.createBufferSource(), f = off.createBiquadFilter(), g = off.createGain();
+    s.buffer = b; f.type = 'highpass'; f.frequency.value = 8000; g.gain.value = 0.22;
+    s.connect(f).connect(g).connect(master); s.start(t);
+  };
+  const pad = off.createOscillator(), pg = off.createGain();
+  pad.type = 'sawtooth'; pad.frequency.value = 55;         // A1 drone under everything
+  const lp = off.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 240;
+  pg.gain.value = 0.10;
+  pad.connect(lp).connect(pg).connect(master); pad.start(0); pad.stop(TL.duration);
+  for (let bar = 0; bar < bars; bar++) {
+    for (let b = 0; b < 4; b++) {
+      const t = (bar * 4 + b) * beat;
+      if (b === 0) kick(t);
+      hat(t + beat / 2);
+    }
+  }
+  const buf = await off.startRendering();
+  return { mime: 'wav', base64: audioBufferToWavBase64(buf) };
+};
+
+function audioBufferToWavBase64(buffer) {
+  const ch = buffer.numberOfChannels, sr = buffer.sampleRate, len = buffer.length;
+  const bytes = 44 + len * ch * 2;
+  const ab = new ArrayBuffer(bytes), v = new DataView(ab);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); v.setUint32(4, bytes - 8, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, ch, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * ch * 2, true);
+  v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true);
+  ws(36, 'data'); v.setUint32(40, len * ch * 2, true);
+  let o = 44;
+  const chans = Array.from({ length: ch }, (_, i) => buffer.getChannelData(i));
+  for (let i = 0; i < len; i++) for (let c = 0; c < ch; c++) {
+    const s = Math.max(-1, Math.min(1, chans[c][i]));
+    v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true); o += 2;
+  }
+  let bin = ''; const u8 = new Uint8Array(ab);
+  for (let i = 0; i < u8.length; i += 0x8000)
+    bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+/* ---- init: timeline → VIDEO → canvas; multi-aspect recomposition via ?ar=9:16 ---- */
+(async function init() {
+  try {
+    const res = await fetch('timeline.json');
+    if (res.ok) TL = Object.assign(TL, await res.json());
+  } catch (e) { /* standalone demo mode */ }
+  const ar = new URLSearchParams(location.search).get('ar');
+  if (ar === '9:16') { TL.width = 1080; TL.height = 1920; }
+  if (ar === '1:1')  { TL.width = 1080; TL.height = 1080; }
+  VIDEO = { width: TL.width, height: TL.height, fps: TL.fps, duration: TL.duration };
+  canvas.width = VIDEO.width; canvas.height = VIDEO.height;
+  // Preload real fonts here before frame 0, e.g.:
+  // await document.fonts.load(`900 ${VIDEO.height / 8}px "Archivo Black"`);
+  await document.fonts.ready;
+  window.VIDEO = VIDEO;
+  seek(0);
+})();
+
+/* Preview mode ONLY (browsers): scrub with the mouse. The renderer never uses this. */
+if (typeof window !== 'undefined') {
+  let playing = false, tPreview = 0, last = 0;
+  addEventListener('pointerdown', () => { playing = !playing; });
+  addEventListener('pointermove', (e) => {
+    if (!playing) seek((e.clientX / innerWidth) * VIDEO.duration);
+  });
+  (function loop(ts) {                                    // rAF is FINE for preview only
+    if (playing) {
+      if (last) tPreview += (ts - last) / 1000;
+      last = ts;
+      if (tPreview >= VIDEO.duration) tPreview = 0;
+      seek(tPreview);
+    } else last = 0;
+    requestAnimationFrame(loop);
+  })(0);
+}
+</script>
+</body>
+</html>
