@@ -15,7 +15,32 @@ entièrement avec ce skill (voir [Validé en conditions réelles](#validé-en-co
 
 ## Installation
 
-### Skill principal + enfants (recommandé)
+### Option 1 — `npx skills` (skills.sh, recommandé)
+
+```bash
+npx skills add Ahmed-OC/motion-video-skills -g -s '*' -y          # les 3 skills, tu choisis l'agent
+npx skills add Ahmed-OC/motion-video-skills -g -s '*' -a '*' -y   # les 3 skills, TOUS les agents détectés
+npx skills add Ahmed-OC/motion-video-skills -g -s motion-video -y # seulement le skill principal
+```
+
+Installe en canonique dans `~/.agents/skills/` puis symlink vers chaque agent trouvé
+(Claude Code, Cursor, Codex, Cline, Amp, Augment…). Met à jour plus tard avec
+`npx skills update`. **Nécessite Node ≥ 22** — sinon, option 2 ou 3.
+
+### Option 2 — curl (une ligne, n'importe quel shell, n'importe quel Node)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Ahmed-OC/motion-video-skills/main/install.sh | bash
+```
+
+Met les 3 skills en place dans `~/.agents/skills/` (idempotent : re-lancer = mise à jour).
+Variantes :
+```bash
+curl -fsSL https://raw.githubusercontent.com/Ahmed-OC/motion-video-skills/main/install.sh | bash -s -- ~/.claude/skills
+curl -fsSL https://raw.githubusercontent.com/Ahmed-OC/motion-video-skills/main/install.sh | bash -s -- ./.agents/skills   # projet courant
+```
+
+### Option 3 — git clone (manuel)
 
 ```bash
 git clone --depth 1 https://github.com/Ahmed-OC/motion-video-skills /tmp/mvs \
@@ -24,9 +49,8 @@ git clone --depth 1 https://github.com/Ahmed-OC/motion-video-skills /tmp/mvs \
   && rm -rf /tmp/mvs
 ```
 
-> Windows (Git Bash) : la commande fonctionne telle quelle. `~/.agents/skills/` est
-> l'emplacement standard multi-outils ; pour un seul projet, utilisez plutôt
-> `<projet>/.agents/skills/`.
+> `~/.agents/skills/` est l'emplacement standard multi-outils, lu nativement par ZCode et
+> la plupart des agents ; pour un seul projet, utilisez `<projet>/.agents/skills/`.
 
 **Prérequis du pipeline de rendu** (le skill affiche les commandes exactes si absent) :
 ```bash
@@ -36,13 +60,12 @@ ffmpeg -version                  # sinon : winget install Gyan.FFmpeg (Win) / br
 pip install edge-tts             # optionnel — voix off gratuite
 ```
 
-<details><summary>Installer uniquement un skill enfant</summary>
+<details><summary>Installer uniquement les skills enfants</summary>
 
 ```bash
-git clone --depth 1 https://github.com/Ahmed-OC/motion-video-skills /tmp/mvs \
-  && mkdir -p ~/.agents/skills \
-  && cp -r /tmp/mvs/skills/video-qa /tmp/mvs/skills/tts-voiceover ~/.agents/skills/ \
-  && rm -rf /tmp/mvs
+npx skills add Ahmed-OC/motion-video-skills -g -s video-qa -s tts-voiceover -y
+# ou via curl : l'installeur copie tout — supprime simplement le dossier non voulu :
+#   rm -rf ~/.agents/skills/motion-video
 ```
 </details>
 
