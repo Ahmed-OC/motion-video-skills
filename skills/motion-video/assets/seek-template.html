@@ -51,10 +51,17 @@ let TL = {
   ]
 };
 
-/* ---- springs & easing (closed-form: safe to evaluate at any t) ---- */
+/* ---- springs & easing (closed-form: safe to evaluate at any t) ----
+   ζ ≥ 1 MUST take the critically-damped branch: the underdamped formula divides by
+   ω_d = 0 there → NaN → canvas draws the element as NOTHING, with zero JS errors. */
 function springAt(t, f0, zeta) {
   if (t <= 0) return 0;
-  const w0 = 2 * Math.PI * f0, wd = w0 * Math.sqrt(1 - zeta * zeta);
+  const w0 = 2 * Math.PI * f0;
+  if (zeta >= 1) {
+    const s = 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+    return Math.abs(s - 1) < 0.0005 ? 1 : s;           // clamp once sub-pixel
+  }
+  const wd = w0 * Math.sqrt(1 - zeta * zeta);
   const s = 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t));
   return Math.abs(s - 1) < 0.0005 ? 1 : s;           // clamp once sub-pixel
 }

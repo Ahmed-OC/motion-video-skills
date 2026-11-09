@@ -31,10 +31,20 @@ by every viral code-video in 2025–2026.
 ### Spring presets (closed-form, seek-safe — evaluate from elapsed time, no simulation)
 
 ```js
-// Underdamped spring step response: s(t) = 1 - e^(-ζω₀t)·(cos(ω_d t) + (ζω₀/ω_d)·sin(ω_d t))
+// Spring step response (closed form, seek-safe — evaluate from elapsed time, no simulation).
+// ζ < 1 underdamped (overshoots and settles). ζ ≥ 1 critical/overdamped (no overshoot).
+// NEVER evaluate the underdamped formula at ζ ≥ 1: ω_d = 0 → division by zero → NaN, and
+// canvas draws NaN as NOTHING — the element silently vanishes with zero JS errors.
 function spring(t, f0, zeta) {
-  const w0 = 2 * Math.PI * f0, wd = w0 * Math.sqrt(1 - zeta * zeta);
-  return 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t));
+  if (t <= 0) return 0;
+  const w0 = 2 * Math.PI * f0;
+  if (zeta >= 1) {                                      // critically damped branch
+    const s = 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+    return Math.abs(s - 1) < 0.0005 ? 1 : s;
+  }
+  const wd = w0 * Math.sqrt(1 - zeta * zeta);
+  const s = 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t));
+  return Math.abs(s - 1) < 0.0005 ? 1 : s;
 }
 const SPRINGS = {
   ui:      (t) => spring(t, 3.2, 0.55),  // snappy UI elements, slight overshoot
