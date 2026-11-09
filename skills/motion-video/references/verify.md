@@ -111,7 +111,44 @@ frames, and reports:
 Without `--cuts`, every cut is reported as a spike: the timeline's scene starts are the
 cut list — pass them.
 
-## 4. The critic loop (builder ≠ judge)
+## 4. The element lifecycle audit (per element, across shots)
+
+The per-scene watch finds broken things; the **lifecycle pass** finds incoherent things.
+List every recurring element (finger, card, notification, mascot, counter, caption bar…)
+and follow each one across EVERY shot it appears in, checking seven calibrations:
+
+| Calibration | Anchored numbers |
+|---|---|
+| **Entrance** | caused (tap / spoken word / beat), animated ≥3 frames, staggered after its container — never before it |
+| **Hold / reading time** | text ≥ 0.3s/word + 0.5s · number/figure ≥ 0.9s AFTER settling (a counter still moving at the cut was never read) · feedback mark (✓ ripple stamp) 0.3–0.45s |
+| **Alive during hold** | micro-motion (breathing, pulse, progress) or intentional stillness; no idle jitter on props |
+| **Transit velocity** | half the frame in <0.2s = reads as a pop · <15% of frame per second = sluggish · arcs, one easing family |
+| **Exit** | purposeful, faster than entrance, exactly when its job is done or its successor arrives · never mid-read, never lingering dead |
+| **Scale & identity** | sized to importance (one focal point at a time) · identical proportions in every appearance · physically plausible (hand < phone) |
+| **Chaining** | cause precedes effect frame-exactly: tap → response · swipe → next card · arrival → reaction · nothing before its container |
+
+Why a per-element pass: these defects are **invisible scene-by-scene**. A checkmark that
+leaves after 0.2s is fine inside its scene and fatal when you realize the viewer never
+read it; a counter still animating at the cut is invisible per-scene and obvious when you
+follow only the counter. Real cases from production: confetti bursting 0.6s before the
+event that triggers it (chaining), a stamp landing on the card that was never swiped
+(chaining), a counter reaching its final value 2 frames before the cut (hold), a finger
+resting 0.55s on the brand it was about to tap (entrance/hold of the *occluded* element),
+a thumb bigger than the phone (scale).
+
+Programmatic counterparts where possible:
+- **Presence windows** are scene invariants (§0.2): "card visible t∈[a,b]", "check holds
+  ≥0.3s after appearing".
+- **Hold times** are assertable from the timeline: for every caption/text, hold ≥
+  0.3s×words + 0.5s; for every counter, final value must be stable for ≥0.9s before the
+  scene ends.
+- **Transit velocity** comes free from `disco.mjs`: a spike pair at frames [a, b] with
+  nothing between means the element crossed the frame in b−a frames — compute px/frame
+  from the crops if it matters.
+- **Position drift during holds**: sample the element's bounding box at two instants of
+  its hold; if it moved without an intended transition, the anchor is unanchored.
+
+## 5. The critic loop (builder ≠ judge)
 
 After rendering, review the RENDER (not your code) against this rubric, scoring each /10:
 
@@ -146,7 +183,7 @@ margins far more often than renders clip text. Validate on the render; a defect 
 reappears round after round means the generator is missing a structural rule — fix the
 class (one helper, one invariant), never the instance.
 
-## 5. Determinism tests (before trusting the pipeline)
+## 6. Determinism tests (before trusting the pipeline)
 
 - **Per-instant, cheap**: `stills.mjs --determinism` (see 0.3) — each requested instant
   rendered twice on fresh pages, byte-compared.
@@ -161,12 +198,12 @@ class (one helper, one invariant), never the instance.
 
 Trust measurements over impressions — including your own visual review.
 
-## 6. Multi-aspect check
+## 7. Multi-aspect check
 
 Each aspect ratio gets its own contact sheet + full watch. Common failure: recomposed
 layouts push captions into the 9:16 UI-safe zones or shrink hero type below minimum.
 
-## 7. Finishing pipeline (loudness + color) & delivery
+## 8. Finishing pipeline (loudness + color) & delivery
 
 Renders mux the raw mix — normalize as an audio-only re-encode (video stream copied, so it
 takes seconds):

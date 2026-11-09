@@ -201,6 +201,46 @@ Checking catches defects late; structure prevents them. Six rules, content-agnos
    `disco.mjs`: every planned cut must produce exactly one discontinuity at its frame,
    and no spike may exist off-list.
 
+## The element lifecycle — every element earns its frames
+
+The generator contract prevents broken things; the lifecycle audit makes them **coherent**.
+Every visible element has a life — appear → hold → transit → exit — and coherence means
+each phase is calibrated, in itself and against the other phases. For dense films, write
+the lifecycle into the brief as a table (element | appears | holds | exits | relative size
+| role); in review, audit **one pass per element across all shots**, not one pass per
+scene — lifecycle defects are invisible scene-by-scene.
+
+Seven calibrations, per element:
+
+1. **Entrance — caused, not casual.** It enters when its cause lands (a tap, a spoken word,
+   a beat), animated ≥3 frames, staggered after its container, never before it. A tap
+   ripple before the finger lands is a reversed cause.
+2. **Hold — readable.** Text holds ≥ 0.3s/word + 0.5s. A number or key figure holds ≥ 0.9s
+   AFTER reaching its final value (a counter that keeps moving to the cut was never read).
+   A feedback mark (✓, ripple, stamp) holds 0.3–0.45s. An element that leaves mid-read was
+   decoration, not information; one that lingers after relevance is a leftover.
+3. **Alive, but calm.** During holds something micro moves (breathing, pulse, progress) or
+   the stillness is intentional; no idle jitter on static props.
+4. **Transit — readable velocity.** Crossing half the frame in <0.2s reads as a pop;
+   crossing <15% in a second reads as sluggish. Travel on arcs with the film's easing —
+   the same easing family everywhere (one overshoot language).
+5. **Exit — purposeful, faster than the entrance**, at the moment its job is done or its
+   successor takes over. Vanishing mid-use and lingering dead are the two killers.
+6. **Scale & identity.** Sized to its importance — one focal point at a time — and
+   identical to its other appearances (same draw function). A hand bigger than the phone
+   it taps breaks the world; a title smaller than its caption inverts the hierarchy.
+7. **Chaining — cause precedes effect frame-exactly.** Tap → response; swipe → next card;
+   arrival → reaction. Nothing appears before its container, nothing leaves before what
+   depends on it, two focal entrances never compete on the same frames unless the beat
+   demands a simultaneous hit.
+
+Calibration is the meta-rule: every number above is a range anchored to the film's own
+motion table. Nothing exaggerated (overshoot on everything, giant numbers, screaming
+entrances), nothing lax (linear drift, endless frozen holds, low-contrast small text).
+Programmatic counterparts: presence windows are scene invariants (rule 5 above), hold
+times are assertable from the timeline, and `disco.mjs`'s spike pairs measure transit
+speed — see `references/verify.md` §lifecycle.
+
 ## Reading map
 
 - Before writing the BRIEF or any motion code → `references/motion-craft.md`

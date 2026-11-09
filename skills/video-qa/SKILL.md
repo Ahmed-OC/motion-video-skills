@@ -98,6 +98,12 @@ Review the RENDER — not the source, not intentions — scoring each /10:
 4. **Sync** — events land on the beat/word grid?
 5. **Style consistency** — one palette family, one type system, unified transitions?
 6. **Sound** — VO clear, music ducked, target loudness, no clipping?
+7. **Element lifecycle** — per recurring element (follow it ACROSS shots, one pass per
+   element): entrance caused & animated; hold ≥ reading time (text 0.3s/word + 0.5s,
+   figures ≥ 0.9s settled, feedback 0.3–0.45s); alive but calm during holds; transit at
+   readable velocity (half a frame in <0.2s = a pop; <15% per second = sluggish); exit
+   purposeful and faster; scale consistent with its other appearances; cause → effect in
+   frame-exact order (tap before response, swipe before next card).
 
 Protocol: log the 3 worst defects WITH timestamps → fix exactly those → re-render →
 re-score. 3–5 rounds to ≥8/10 everywhere is normal. Run the critic in a fresh context
@@ -110,6 +116,14 @@ doesn't flag them. Have it grade P0 (breaks the illusion) → P1 (visible) → P
 P3 (nitpick). Then apply the rule of evidence to every claim before fixing. If the same
 defect class comes back round after round, the generator is missing a structural rule —
 fix the class, not the instance.
+
+**Then the per-element lifecycle pass** — after the per-act watch, run ONE pass per
+recurring element (the finger, the card, the notification, the mascot, the counter…):
+follow it across every shot it appears in and check the seven calibrations (entrance
+caused · hold readable · alive but calm · transit readable · exit purposeful · scale
+consistent · cause-before-effect). Lifecycle defects — a mark that leaves mid-read, a
+counter moving to the cut, an element entering before its container — are invisible
+scene-by-scene and only surface when one element is followed end to end.
 
 ## 6. Determinism (for generated/repeatable videos)
 

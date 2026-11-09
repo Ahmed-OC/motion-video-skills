@@ -60,6 +60,10 @@ async function freshPage() {
   page.on('console', (m) => { if (m.type() === 'error') errors.add(`console: ${m.text()}`); });
   await page.goto(url);
   await page.evaluate(async () => { if (window.onReady) await window.onReady(); });
+  // the viewport MUST cover the whole frame: seek pages usually set overflow:hidden, so an
+  // element screenshot cannot scroll — anything outside the viewport comes out black
+  const V = await page.evaluate(() => window.VIDEO);
+  if (V && V.width && V.height) await page.setViewportSize({ width: V.width, height: V.height });
   return page;
 }
 async function shoot(page, t) {
