@@ -357,6 +357,8 @@
   const frameRegistry = {
     t: 0,
     sceneId: null,
+    shotPreset: null,
+    cameraZoom: 1,
     nanErrors: [],
     nodes: [],
   };
@@ -485,11 +487,19 @@
     beginFrame(t, sceneId = null) {
       frameRegistry.t = t;
       frameRegistry.sceneId = sceneId;
+      frameRegistry.shotPreset = null;
+      frameRegistry.cameraZoom = 1;
       frameRegistry.nanErrors = [];
       frameRegistry.nodes = [];
     },
     setScene(sceneId) {
       frameRegistry.sceneId = sceneId;
+    },
+    setShot(preset) {
+      frameRegistry.shotPreset = preset;
+    },
+    setCameraZoom(z) {
+      frameRegistry.cameraZoom = z;
     },
     registerNode(node) {
       if (!node || node.w < 1 || node.h < 1 || (node.opacity !== undefined && node.opacity < 0.08)) return;
@@ -499,6 +509,22 @@
         opacity: 1,
         allowOverlapIds: [],
         ...node,
+      });
+    },
+    record(entry) {
+      if (!entry) return;
+      const r = entry.rect || entry;
+      this.registerNode({
+        id: entry.id || `mvs_node_${frameRegistry.nodes.length}`,
+        role: entry.role || entry.kind || 'diagram',
+        text: entry.text || '',
+        x: r.x,
+        y: r.y,
+        w: r.w,
+        h: r.h,
+        fg: entry.fg || null,
+        bg: entry.bg || null,
+        allowOverlapIds: entry.allowOverlapIds || [],
       });
     },
     snapshot() {
@@ -628,6 +654,61 @@
       w: Math.max(4, rect.w - padX * 2),
       h: Math.max(4, rect.h - padY * 2),
     };
+  }
+
+  /**
+   * 6 Master Cinematographic Shot Topologies (automatically adapts to 16:9 and 9:16).
+   * Prevents "4 identical 50/50 slides" monotony and alternates viewer Eye-Trace polarity.
+   */
+  function shotLayout(safe, preset = 'split-lr') {
+    const isPortrait = safe.aspect === '9:16';
+    TELEMETRY.setShot(preset);
+
+    if (preset === 'establishing-wide') {
+      if (isPortrait) {
+        const [header, heroVisual, lowerThird] = vstack(safe, [0.24, 0.56, 0.20], 20);
+        return { preset, header, heroVisual, lowerThird, primary: header, visual: heroVisual };
+      }
+      const [leftCol, rightStage] = hstack(safe, [0.36, 0.64], 36);
+      const [kicker, hero, lowerThird] = vstack(leftCol, [{ px: 34 }, 0.52, 0.36], 18);
+      return { preset, kicker, header: hero, heroVisual: rightStage, lowerThird, primary: leftCol, visual: rightStage };
+    }
+
+    if (preset === 'split-rl') {
+      const [visual, primary] = isPortrait
+        ? vstack(safe, [0.56, 0.44], 24)
+        : hstack(safe, [0.58, 0.42], 38);
+      return { preset, visual, primary };
+    }
+
+    if (preset === 'macro-focus') {
+      const [header, stage, footerStrip] = vstack(safe, [{ px: 86 }, 1, { px: 122 }], 22);
+      const footerCols = hstack(footerStrip, 3, 20);
+      return { preset, header, stage, footerStrip, footerCols, primary: header, visual: stage };
+    }
+
+    if (preset === 'bento-command') {
+      const [header, body] = vstack(safe, [{ px: 84 }, 1], 22);
+      const [kpiCol, heroChart] = isPortrait
+        ? vstack(body, [0.42, 0.58], 20)
+        : hstack(body, [0.36, 0.64], 28);
+      const [kpiTop, kpiBottom] = isPortrait ? hstack(kpiCol, 2, 16) : vstack(kpiCol, 2, 20);
+      return { preset, header, kpiTop, kpiBottom, heroChart, primary: kpiCol, visual: heroChart };
+    }
+
+    if (preset === 'monumental-payoff') {
+      const padX = Math.round(safe.w * (isPortrait ? 0.04 : 0.12));
+      const padY = Math.round(safe.h * 0.10);
+      const core = insetRect(safe, padX, padY);
+      const [kicker, heroCenter, subCenter, badgeRow] = vstack(core, [{ px: 36 }, 0.48, 0.28, { px: 88 }], 20);
+      return { preset, kicker, heroCenter, subCenter, badgeRow, primary: heroCenter, visual: badgeRow };
+    }
+
+    // Default: 'split-lr'
+    const [primary, visual] = isPortrait
+      ? vstack(safe, [0.44, 0.56], 24)
+      : hstack(safe, [0.42, 0.58], 38);
+    return { preset: 'split-lr', primary, visual };
   }
 
   // ============================================================================
@@ -979,8 +1060,16 @@
       opacity: anim.opacity,
     });
 
-    const pad = opts.padding !== undefined ? opts.padding : Math.round(Math.min(rect.w, rect.h) * 0.10);
-    return { id: cardId, inner: insetRect(worldRect, pad, pad), bg: fill, opacity: anim.opacity };
+    const padY = opts.padding !== undefined ? opts.padding : Math.max(12, Math.round(Math.min(rect.w, rect.h) * 0.10));
+    const padX = opts.padding !== undefined ? opts.padding : Math.max(22, padY);
+    const barLeft = opts.accentBar && opts.accentBar !== 'top' ? 8 : 0;
+    const localInner = {
+      x: rect.x + padX + barLeft,
+      y: rect.y + padY,
+      w: Math.max(8, rect.w - padX * 2 - barLeft),
+      h: Math.max(8, rect.h - padY * 2),
+    };
+    return { id: cardId, inner: localInner, bg: fill, opacity: anim.opacity };
   }
 
   function formatMetricNumber(val, decimals = 0, prefix = '', suffix = '') {
@@ -1894,15 +1983,148 @@
   }
 
   // ============================================================================
-  // 10. SCENE ROUTER + VELOCITY-MATCHED TRANSITIONS + YOIN CAMERA DRIFT
+  // 10. CINEMATOGRAPHY RIG, 3-ACT TEMPORAL EVOLUTION & 8-TRANSITION MONTAGE
   // ============================================================================
+
+  /**
+   * Computes a 3-Act Intra-Scene Temporal Envelope:
+   * - act1Enter (0..1): Primary staggered reveal (0%..22%)
+   * - act2Focus (0..1): Secondary focus / camera push / callout reveal (ramps 36%..66%)
+   * - act3Exit  (0..1): Pre-roll anticipation into outgoing cut (last 0.28s)
+   */
+  function sceneActs(localT, duration) {
+    const dur = Math.max(0.4, duration || 3.5);
+    const progress = clamp(localT / dur, 0, 1);
+    const act1Enter = EASE.kireOut(clamp(localT / Math.min(0.65, dur * 0.24), 0, 1));
+    const act2Focus = EASE.studioInOut(clamp((progress - 0.34) / 0.30, 0, 1));
+    const preRollSpan = Math.min(0.30, dur * 0.14);
+    const act3Exit = EASE.quadInExact(clamp((localT - (dur - preRollSpan)) / Math.max(0.05, preRollSpan), 0, 1));
+    const focusPulse = Math.sin(clamp((progress - 0.34) / 0.52, 0, 1) * Math.PI);
+    return { progress, act1Enter, act2Focus, act3Exit, focusPulse };
+  }
+
+  /**
+   * Smoothly pushes & pans the virtual camera toward `targetRect` by `amount` (0..1).
+   */
+  function withCameraFocus(ctx, width, height, targetRect, amount, maxZoom = 1.18, drawFn) {
+    const a = clamp(amount, 0, 1);
+    const z = expZoom(1.0, maxZoom, a);
+    TELEMETRY.setCameraZoom(z);
+    ctx.save();
+    if (targetRect && (targetRect.w < width * 0.90 || targetRect.h < height * 0.90)) {
+      // Sub-slot lens zoom: clip cleanly to the panel frame and focus toward upper-right data peak
+      roundRectPath(ctx, targetRect.x, targetRect.y, targetRect.w, targetRect.h, 22);
+      ctx.clip();
+      const fx = targetRect.x + targetRect.w * 0.62;
+      const fy = targetRect.y + targetRect.h * 0.44;
+      ctx.translate(fx, fy);
+      ctx.scale(z, z);
+      ctx.translate(-fx, -fy);
+    } else {
+      const cx = targetRect ? targetRect.x + targetRect.w * 0.5 : width * 0.5;
+      const cy = targetRect ? targetRect.y + targetRect.h * 0.5 : height * 0.5;
+      const panX = lerp(width * 0.5, cx, a * 0.42);
+      const panY = lerp(height * 0.5, cy, a * 0.42);
+      ctx.translate(width * 0.5, height * 0.5);
+      ctx.scale(z, z);
+      ctx.translate(-panX, -panY);
+    }
+    try {
+      drawFn();
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Multi-plane depth parallax (-1 = background 0.25x, 0 = midground 1x, +1 = foreground HUD 1.35x).
+   */
+  function withParallax(ctx, localT, depthZ = 0, drawFn) {
+    const dx = Math.sin(localT * 0.55) * 14 * depthZ;
+    const dy = Math.cos(localT * 0.42) * 8 * depthZ;
+    ctx.save();
+    ctx.translate(dx, dy);
+    try {
+      drawFn();
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Architectural 45-degree leader-line callout spotlight (Act-II detail reveal).
+   */
+  function drawCallout(ctx, anchorPt, badgeRect, opts = {}) {
+    const theme = getTheme(opts.theme);
+    const localT = opts.localT ?? 1;
+    const delay = opts.delay ?? 0.9;
+    const reveal = EASE.kireOut(clamp((localT - delay) / (opts.dur ?? 0.42), 0, 1));
+    if (reveal <= 0.01) return;
+
+    const [ax, ay] = anchorPt;
+    const bx = badgeRect.x + (ax < badgeRect.x ? 0 : ax > badgeRect.x + badgeRect.w ? badgeRect.w : badgeRect.w * 0.5);
+    const by = badgeRect.y + badgeRect.h * 0.5;
+    const elbowX = lerp(ax, bx, 0.45);
+    const accent = opts.color || theme.accent;
+
+    ctx.save();
+    ctx.globalAlpha *= reveal;
+
+    // Pulsing target reticle on focal detail
+    const pulse = 1 + Math.sin(localT * 5.2) * 0.16;
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(ax, ay, 8 * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(ax, ay, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Progressive leader line
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    const seg1 = clamp(reveal * 2, 0, 1);
+    ctx.lineTo(lerp(ax, elbowX, seg1), lerp(ay, by, seg1));
+    if (reveal > 0.5) {
+      const seg2 = clamp((reveal - 0.5) * 2, 0, 1);
+      ctx.lineTo(lerp(elbowX, bx, seg2), by);
+    }
+    ctx.stroke();
+
+    // Callout pill surface + auto-fit label
+    drawCard(ctx, badgeRect, {
+      id: opts.id ? `${opts.id}_card` : 'callout_card',
+      theme,
+      fill: theme.surfaceHi || theme.surface,
+      borderColor: accent,
+      radius: 12,
+      shadow: true,
+    });
+    const inner = insetRect(badgeRect, 14, 8);
+    drawTextAutoFit(ctx, opts.text || opts.label || '', inner, {
+      id: opts.id || 'callout_txt',
+      role: 'label',
+      color: theme.fg,
+      bg: theme.surfaceHi || theme.surface,
+      fontFamily: theme.fontMono,
+      weight: 600,
+      maxPx: 22,
+      minPx: 13,
+    });
+    ctx.restore();
+  }
+
   function renderTimeline(ctx, timeline, sceneRenderers, t, opts = {}) {
     const W = timeline.width || ctx.canvas.width;
     const H = timeline.height || ctx.canvas.height;
     const safe = computeSafeZone(W, H, timeline.meta?.aspect || 'auto');
     const theme = getTheme(opts.theme || timeline.meta?.style);
     const scenes = timeline.scenes || [];
-    const transDur = opts.transitionDur !== undefined ? opts.transitionDur : 0.36;
+    const baseTransDur = opts.transitionDur !== undefined ? opts.transitionDur : 0.38;
 
     let activeIdx = scenes.findIndex((s) => t >= s.start && t < s.start + s.duration);
     if (activeIdx === -1) activeIdx = t < (scenes[0]?.start || 0) ? 0 : Math.max(0, scenes.length - 1);
@@ -1910,18 +2132,21 @@
     if (!cur) return;
 
     const localT = Math.max(0, t - cur.start);
+    const mode = cur.transition || opts.transition || 'whip';
+    const transDur = mode === 'cut' ? 0 : baseTransDur;
     TELEMETRY.beginFrame(t, cur.id);
 
-    const invokeScene = (sc, scLocalT, alpha = 1, offsetX = 0, scaleMul = 1) => {
+    const invokeScene = (sc, scLocalT, alpha = 1, offsetX = 0, scaleMul = 1, offsetY = 0) => {
       const fn = sceneRenderers[sc.id] || sceneRenderers.default;
       if (typeof fn !== 'function') return;
       ctx.save();
       ctx.globalAlpha *= clamp(alpha, 0, 1);
 
-      // Continuous Japanese Yoin subtle camera drift so holds NEVER freeze!
-      const driftZoom = opts.cameraDrift === false ? 1 : expZoom(1.0, 1.028, scLocalT / Math.max(1, sc.duration)) * scaleMul;
-      const driftX = (opts.cameraDrift === false ? 0 : (scLocalT / Math.max(1, sc.duration) - 0.5) * 14) + offsetX;
-      ctx.translate(W * 0.5 + driftX, H * 0.5);
+      // Continuous Japanese Yoin subtle camera drift + Act-III exit anticipation
+      const acts = sceneActs(scLocalT, sc.duration);
+      const driftZoom = opts.cameraDrift === false ? scaleMul : expZoom(1.0, 1.028, acts.progress) * scaleMul;
+      const driftX = (opts.cameraDrift === false ? 0 : (acts.progress - 0.5) * 14) + offsetX;
+      ctx.translate(W * 0.5 + driftX, H * 0.5 + offsetY);
       ctx.scale(driftZoom, driftZoom);
       ctx.translate(-W * 0.5, -H * 0.5);
 
@@ -1931,7 +2156,8 @@
         t,
         localT: scLocalT,
         duration: sc.duration,
-        progress: clamp(scLocalT / Math.max(0.01, sc.duration), 0, 1),
+        progress: acts.progress,
+        acts,
         scene: sc,
         safe,
         width: W,
@@ -1941,23 +2167,71 @@
       ctx.restore();
     };
 
-    // Dual-scene velocity-matched wipe/whip at scene boundary
-    if (activeIdx > 0 && localT < transDur && transDur > 0.02) {
+    // 8-Mode Motivated Cinematographic Transition Engine
+    if (activeIdx > 0 && transDur > 0.02 && localT < transDur) {
       const prev = scenes[activeIdx - 1];
+      const prevLocalT = t - prev.start;
       const u = EASE.studioInOut(clamp(localT / transDur, 0, 1));
-      const mode = cur.transition || opts.transition || 'whip';
-      if (mode === 'portal') {
-        invokeScene(prev, t - prev.start, 1 - u, 0, expZoom(1, 1.35, u));
-        invokeScene(cur, localT, u, 0, expZoom(0.84, 1, u));
+
+      if (mode === 'portal' || mode === 'zoom-in') {
+        invokeScene(prev, prevLocalT, 1 - u, 0, expZoom(1.0, 1.46, u));
+        invokeScene(cur, localT, u, 0, expZoom(0.76, 1.0, u));
+      } else if (mode === 'zoom-out') {
+        invokeScene(prev, prevLocalT, 1 - u, 0, expZoom(1.0, 0.68, u));
+        invokeScene(cur, localT, u, 0, expZoom(1.32, 1.0, u));
+      } else if (mode === 'push-up') {
+        invokeScene(prev, prevLocalT, 1 - u * 0.55, 0, lerp(1.0, 0.91, u), -u * H * 0.32);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, H * (1 - u), W, H * u);
+        ctx.clip();
+        invokeScene(cur, localT, 1, 0, 1, (1 - u) * H * 0.24);
+        ctx.restore();
+      } else if (mode === 'iris') {
+        invokeScene(prev, prevLocalT, 1 - u * 0.35, 0, 1);
+        const maxR = Math.hypot(W, H) * 0.62;
+        const r = Math.max(2, u * maxR);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(W * 0.5, H * 0.5, r, 0, Math.PI * 2);
+        ctx.clip();
+        invokeScene(cur, localT, 1, 0, expZoom(0.92, 1.0, u));
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(W * 0.5, H * 0.5, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      } else if (mode === 'dissolve') {
+        invokeScene(prev, prevLocalT, 1 - u, 0, 1);
+        invokeScene(cur, localT, u, 0, 1);
+      } else if (mode === 'whip-right') {
+        invokeScene(prev, prevLocalT, 1 - u * 0.85, u * W * 0.22, 1);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, W * u, H);
+        ctx.clip();
+        invokeScene(cur, localT, 1, -(1 - u) * W * 0.14, 1);
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(W * u, 0);
+        ctx.lineTo(W * u, H);
+        ctx.stroke();
+        ctx.restore();
       } else {
-        invokeScene(prev, t - prev.start, 1 - u * 0.85, -u * W * 0.22, 1);
+        // 'whip' / 'whip-left'
+        invokeScene(prev, prevLocalT, 1 - u * 0.85, -u * W * 0.22, 1);
         ctx.save();
         ctx.beginPath();
         ctx.rect(W * (1 - u), 0, W * u, H);
         ctx.clip();
         invokeScene(cur, localT, 1, (1 - u) * W * 0.14, 1);
         ctx.restore();
-        // Kire accent slash line on transition edge
         ctx.save();
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 3;
@@ -1967,7 +2241,7 @@
         ctx.stroke();
         ctx.restore();
       }
-      // Keep telemetry focused on settled scene nodes outside transition window
+
       if (localT < transDur * 0.85) {
         frameRegistry.nodes = [];
       }
@@ -2283,7 +2557,7 @@
   }
 
   const MVS = {
-    version: '2.0.0',
+    version: '2.1.0',
     clamp,
     lerp,
     remap,
@@ -2298,6 +2572,9 @@
     expZoom,
     squashStretch,
     entrance,
+    sceneActs,
+    withCameraFocus,
+    withParallax,
     oklch,
     mixOklch,
     studioShadePair,
@@ -2308,6 +2585,7 @@
     hstack,
     bentoGrid,
     insetRect,
+    shotLayout,
     drawTextAutoFit,
     drawBackdrop,
     drawCard,
@@ -2319,6 +2597,7 @@
     drawGlobeWire,
     drawCodeCard,
     drawActor,
+    drawCallout,
     drawHudOverlay,
     drawCaptions,
     createShaderBackdrop,

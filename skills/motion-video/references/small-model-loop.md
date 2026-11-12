@@ -19,16 +19,32 @@ Small models fail when doing mental 2D pixel arithmetic (`ctx.fillText(str, 420,
 ```ts
 type Rect = { x: number; y: number; w: number; h: number };
 // Scene handler signature called by MVS.renderTimeline(ctx, TL, SCENES, t, { theme }):
-// ({ ctx, t, localT, duration, progress, width, height, safe, theme, scene, timeline }) => void
+// ({ ctx, t, localT, duration, progress, acts, width, height, safe, theme, scene }) => void
+//   where acts = { progress, act1Enter, act2Focus, act3Exit, focusPulse }
 
 MVS.getTheme(name) // 'linear-dark'|'swiss-brutalist'|'paperclip-cn'|'cyber-fui-jp'|'kurzgesagt-pop'|'riso-editorial'|'deep-ocean-atlas'|'apple-keynote'
-// theme fields: { bg, bgAlt, surface, border, fg, muted, accent, accent2, ok, warn, fontDisplay, fontBody, fontMono, dark }
+// theme fields: { bg, bgAlt, surface, surfaceHi, border, fg, muted, accent, accent2, ok, warn, fontDisplay, fontBody, fontMono }
 
-// Layout splitters (return Rect[])
+// Master Cinematographic Shot Topologies (USE THESE — NEVER repeat 'split-lr' 3 scenes in a row!)
+MVS.shotLayout(safe, preset)
+//   'establishing-wide' -> { kicker, header, heroVisual, lowerThird, primary, visual }
+//   'split-lr'          -> { primary /* left 42% */, visual /* right 58% */ }
+//   'split-rl'          -> { visual /* left 58% */, primary /* right 42% */ }  <-- alternates Eye-Trace!
+//   'bento-command'     -> { header, kpiTop, kpiBottom, heroChart, primary, visual }
+//   'macro-focus'       -> { header, stage, footerStrip, footerCols /* Rect[3] */, primary, visual }
+//   'monumental-payoff' -> { kicker, heroCenter, subCenter, badgeRow, primary, visual }
+
+// Low-level Layout Splitters (return Rect[])
 MVS.vstack(rect, weights /* e.g. [{ px: 90 }, 1] or [0.35, 0.65] */, gapPx = 24)
 MVS.hstack(rect, weights /* e.g. [0.46, 0.54] */, gapPx = 32)
 MVS.bentoGrid(rect, cols, rows, gapPx = 24) // returns flat Rect[cols * rows]
 MVS.insetRect(rect, padPx)
+
+// 3-Act Intra-Scene Camera Rig, Parallax & Spotlight Callout
+MVS.sceneActs(localT, duration) // -> { progress, act1Enter, act2Focus /* ramps 34%..64% */, act3Exit, focusPulse }
+MVS.withCameraFocus(ctx, width, height, targetRect, acts.act2Focus, maxZoom /* e.g. 1.14 */, () => { /* draw hero */ })
+MVS.withParallax(ctx, localT, depthZ /* -1 bg, 0 mid, +1 fg */, () => { /* draw layer */ })
+MVS.drawCallout(ctx, [anchorX, anchorY], badgeRect, { id, theme, localT, delay: 1.1, text: 'KEY DETAIL' })
 
 // Backdrop, HUD & Cards
 MVS.drawBackdrop(ctx, width, height, localT, { theme, variant: 'mesh-grid' | 'blueprint' })
@@ -53,7 +69,9 @@ MVS.drawIsometricStack(ctx, rect, { id, theme, localT, delay?: 0.1, layers: [{ l
 MVS.drawFlowBeam(ctx, [x1, y1], [x2, y2], localT, { color?: string, arcLift?: -80, speed?: 0.85, packets?: 3, width?: 2.5 })
 MVS.drawCodeCard(ctx, rect, { id, theme, localT, delay?: 0.08, filename?: 'app.ts', lines: string[], highlightLines?: number[] /* 0-indexed */, typing?: boolean })
 MVS.drawActor(ctx, { id, x, y, scale?: 1, pose?: 'present'|'walk'|'stand'|'meditate', facing?: 1|-1, accentColor?: string, t: localT })
-MVS.renderTimeline(ctx, TL, SCENES, t, { theme?: string, transition?: 'whip'|'portal'|'cut', transDur?: 0.42 })
+
+// 8-Mode Montage Router ('cut' | 'whip' | 'whip-right' | 'push-up' | 'portal' | 'zoom-out' | 'iris' | 'dissolve')
+MVS.renderTimeline(ctx, TL, SCENES, t, { theme?: string, transition?: string, transitionDur?: 0.38 })
 MVS.synthStudioAudio({ bpm?: 120, duration: number, cues?: number[], seed?: 42 }) // returns Promise<{ mime: 'wav', base64 }>
 ```
 

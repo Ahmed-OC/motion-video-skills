@@ -76,18 +76,25 @@ Work inside a project folder (default `video/`) so `brief.md`, `timeline.json`, 
 
 ---
 
-## 3. The 10 Non-Negotiables & Generator Contract
+## 3. Master Cinematography, Montage & 12 Non-Negotiables
 
 1. **Pure `f(t)` Determinism**: Zero `requestAnimationFrame`, `setTimeout`, CSS transitions, `Date.now()`, or unseeded `Math.random()` (use `MVS.mulberry32`).
-2. **One `timeline.json`**: Scene boundaries (`frameIndex / fps`), cue times, captions, and audio envelopes live in one schema.
-3. **3-Regime Energy-Clamped Springs**: Never evaluate `sqrt(1 - ζ²)` at `ζ >= 1` (`NaN` silently deletes Canvas drawings) and never clamp `|pos - 1| < ε` mid-flight. Use `MVS.spring` / `MVS.springApple` + **Lead-Opacity Law** (`MVS.entrance`: opacity finishes in `45%` of transform duration).
-4. **Kill Robotic `sin(t)`**: Use container-level *Yoin* camera drift (`1.0 → 1.028` exponential zoom) + golden-ratio `MVS.idleNoise(t, index)` instead of synchronous `Math.sin(t)`.
-5. **5-Layer Depth & OKLCH Color**: Backdrop + subtle grid/depth cue + rich visual anchor + balanced typography (`tabular-nums` on digits) + vignette/HUD framing. Interpolate gradients in OKLCH (`MVS.oklch`, `MVS.mixOklch`).
-6. **Element Lifecycle Calibration**: Every element earns its frames — caused entrance (`≥3f`, after container), readable hold (`≥ 0.3s/word + 0.5s`; numbers settle `≥ 0.9s` before cut), calm hold life, readable transit velocity, purposeful faster exit (`~0.7×` entrance), consistent scale across shots, and frame-exact cause → effect chaining.
-7. **Smart Multilingual Typography & Captions**: Never use `ch` units on CJK (`1ch ≈ 0.55em` clips glyphs; use `ic`/`em` or `MVS.drawTextAutoFit`); `word-break: keep-all` on Korean; Kinsoku on Japanese; French elisions (`l'IA`) & `\u202F` spaces preserved via `vo_gen.py`; auto-suppress captions duplicating hero titles.
-8. **End-to-End BT.709 + −14 LUFS**: Encode and tag BT.709 so vibrant accents (`#FF4D00`, `#38BDF8`) never shift to muddy BT.601 brown; normalize audio via 2-pass linear `loudnorm` (`post.mjs`).
-9. **Multi-Aspect Recomposition (`?ar=9:16` / `1:1`)**: Reflow layout containers (`hstack` → `vstack`) and enforce 2026 L-shaped social safe zones — never crop pixels.
-10. **Measure Before Fixing (Rule of Evidence)**: Confirm every geometric/visual defect via `audit_telemetry.mjs` or full-res PNG stills before changing code, and lock clean scenes to prevent repair regressions.
+2. **One `timeline.json` & Beat-Locked Cuts**: Scene boundaries (`frameIndex / fps`), cue times, `shot` topologies, `transition` modes, captions, and audio envelopes live in one schema. When `bpm` is set without VO override, snap scene cuts to the musical beat grid (`|t_cut - nearestBeat| <= 65ms`).
+3. **Shot-Scale Variety & Eye-Trace Polarity (Walter Murch Law)**: Never repeat 3 identical Left-Right 50/50 split screens (`SHOT_POLARITY_MONOTONY`). Progress shot scales via `MVS.shotLayout(safe, preset)` across `'establishing-wide'` → `'split-lr'` → `'split-rl'` (reverse polarity!) → `'bento-command'` → `'macro-focus'` → `'monumental-payoff'`, and never repeat the same primary `scene.device` back-to-back.
+4. **Motivated 8-Mode Montage Grammar**: Match every transition semantically to spatial intent (`TRANSITION_MONOTONY` blocks repetitive wipes):
+   - `'cut'`: rhythmic beat-cut or same-axis match cut;
+   - `'whip'` / `'whip-right'`: lateral topic shift (`whip-right` returns Eye-Trace R→L);
+   - `'portal'` / `'zoom-out'`: diving *inside* a component (`portal`) vs pulling back to macro context (`zoom-out`);
+   - `'push-up'`: sequential step/chapter elevation;
+   - `'iris'` / `'dissolve'`: spotlight reveal (`iris`) or contemplative payoff (`dissolve`).
+5. **3-Act Intra-Scene Evolution (`MVS.sceneActs`)**: Every scene ≥ 2.6s must evolve across 3 beats in time — **Act I (0–22%)** staggered entrance (`kicker → hero → visual`), **Act II (34–80%)** secondary revelation (`MVS.withCameraFocus` push onto detail, `MVS.drawCallout` leader-line badge, live chart scrub, or code typing), **Act III (84–100%)** pre-roll momentum into the cut.
+6. **3-Regime Energy-Clamped Springs**: Never evaluate `sqrt(1 - ζ²)` at `ζ >= 1` (`NaN` silently deletes Canvas drawings) and never clamp `|pos - 1| < ε` mid-flight. Use `MVS.spring` / `MVS.springApple` + **Lead-Opacity Law** (`MVS.entrance`: opacity finishes in `45%` of transform duration).
+7. **Kill Robotic `sin(t)` & Add Parallax**: Use container-level *Yoin* camera drift (`1.0 → 1.028` exponential zoom), multi-plane `MVS.withParallax(ctx, localT, depthZ, fn)`, and golden-ratio `MVS.idleNoise(t, index)`.
+8. **5-Layer Depth, Quadrant Balance & OKLCH Color**: Backdrop + depth grid + balanced foreground anchor (never pack >85% of visual mass on one side) + optical typography (`tabular-nums` on digits) + HUD/vignette. Interpolate gradients in OKLCH (`MVS.oklch`, `MVS.mixOklch`).
+9. **Element Lifecycle Calibration**: Every element earns its frames — caused entrance (`≥3f`), readable hold (`≥ 0.3s/word + 0.5s`; numbers settle `≥ 0.9s` before cut), readable transit velocity, purposeful faster exit (`~0.7×` entrance), and frame-exact cause → effect chaining.
+10. **Smart Multilingual Typography & Captions**: Never use `ch` units on CJK (`ic`/`em` or `MVS.drawTextAutoFit`); `word-break: keep-all` on Korean; Kinsoku on Japanese; French elisions (`l'IA`) & `\u202F` spaces via `vo_gen.py`; auto-suppress captions duplicating hero titles.
+11. **End-to-End BT.709 + −14 LUFS**: Encode and tag BT.709 (`render_frames.mjs` + `post.mjs --matrix 709 --loud -14`) so brand hues never shift to muddy BT.601.
+12. **Measure Before Fixing (16-Gate Telemetry Compiler)**: Confirm every geometric, contrast, temporal, and montage issue via `audit_telemetry.mjs` (`< 2.5s`) before encoding MP4, and never edit `LOCKED CLEAN SCENES`.
 
 ---
 

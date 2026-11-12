@@ -46,7 +46,16 @@
           "text": { "type": "string", "description": "Primary on-screen headline (hold >= 0.3s/word + 0.5s, min 1.4s)." },
           "narration": { "type": "string", "description": "Spoken voiceover line for this scene." },
           "device": { "type": "string", "description": "Primary visual anchor / MVS blueprint executed in this scene." },
-          "transition": { "type": "string", "enum": ["cut", "whip", "portal"], "description": "Transition into this scene." },
+          "shot": {
+            "type": "string",
+            "enum": ["establishing-wide", "split-lr", "split-rl", "macro-focus", "bento-command", "monumental-payoff"],
+            "description": "Cinematographic shot topology & polarity (alternate across scenes to guide viewer Eye-Trace)."
+          },
+          "transition": {
+            "type": "string",
+            "enum": ["cut", "whip", "whip-right", "push-up", "portal", "zoom-out", "iris", "dissolve"],
+            "description": "Motivated montage transition into this scene."
+          },
           "suppressCaptions": { "type": "boolean", "description": "Suppress bottom captions when scene displays full-screen kinetic text." },
           "palette": { "type": "array", "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" } },
           "cueTimes": { "type": "array", "items": { "type": "number" } }

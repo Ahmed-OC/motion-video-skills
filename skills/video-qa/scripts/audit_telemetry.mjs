@@ -142,6 +142,9 @@ const scenes = Array.isArray(timeline?.scenes) && timeline.scenes.length
       start: Number(s.start ?? 0),
       duration: Number(s.duration ?? 3),
       text: s.text || '',
+      transition: s.transition || null,
+      device: s.device || null,
+      shot: s.shot || null,
     }))
   : Array.from({ length: Math.max(1, Math.ceil(duration / 3.5)) }, (_, i) => {
       const st = i * 3.5;
@@ -181,18 +184,24 @@ const rawSweep = await page.evaluate(async ({ scenes, width, height, duration })
 
     const sceneSamples = [];
     let prevPixels = null;
+    let earlyPixels = null;
 
-    for (const pt of probes) {
+    for (let sIdx = 0; sIdx < probes.length; sIdx++) {
+      const pt = probes[sIdx];
       if (window.__MVS_TELEMETRY__) window.__MVS_TELEMETRY__.beginFrame(pt, sc.id);
       const r = window.seek(pt);
       if (r && typeof r.then === 'function') await r;
 
-      const snap = window.__MVS_TELEMETRY__ ? window.__MVS_TELEMETRY__.snapshot() : { nodes: [], nanErrors: [] };
+      const snap = window.__MVS_TELEMETRY__
+        ? window.__MVS_TELEMETRY__.snapshot()
+        : { nodes: [], nanErrors: [], shotPreset: null, cameraZoom: 1 };
 
       let meanLuma = 0;
       let stdLuma = 0;
       let activeBgDiffRatio = 0;
       let frameDiff = 0;
+      let earlyVsLateDiff = 0;
+      let leftMassShare = 0.5;
       const nodePixelBg = {};
 
       if (mainCanvas && octx) {
@@ -203,31 +212,45 @@ const rawSweep = await page.evaluate(async ({ scenes, width, height, duration })
           const nPx = thumbW * thumbH;
           let sum = 0;
           let sumSq = 0;
-          // Estimate corner background color
           const cR = (img[0] + img[(thumbW - 1) * 4]) * 0.5;
           const cG = (img[1] + img[(thumbW - 1) * 4 + 1]) * 0.5;
           const cB = (img[2] + img[(thumbW - 1) * 4 + 2]) * 0.5;
           let nonBgCount = 0;
           let diffAcc = 0;
+          let earlyAcc = 0;
+          let leftMass = 0;
+          let rightMass = 0;
 
           for (let i = 0; i < img.length; i += 4) {
+            const pIdx = i >> 2;
+            const pxX = pIdx % thumbW;
             const lum = 0.2126 * img[i] + 0.7152 * img[i + 1] + 0.0722 * img[i + 2];
             sum += lum;
             sumSq += lum * lum;
             const distBg = Math.abs(img[i] - cR) + Math.abs(img[i + 1] - cG) + Math.abs(img[i + 2] - cB);
-            if (distBg > 32) nonBgCount++;
+            if (distBg > 32) {
+              nonBgCount++;
+              if (pxX < thumbW * 0.5) leftMass += distBg;
+              else rightMass += distBg;
+            }
             if (prevPixels) {
               diffAcc += (Math.abs(img[i] - prevPixels[i]) + Math.abs(img[i + 1] - prevPixels[i + 1]) + Math.abs(img[i + 2] - prevPixels[i + 2])) / (3 * 255);
+            }
+            if (earlyPixels) {
+              earlyAcc += (Math.abs(img[i] - earlyPixels[i]) + Math.abs(img[i + 1] - earlyPixels[i + 1]) + Math.abs(img[i + 2] - earlyPixels[i + 2])) / (3 * 255);
             }
           }
           meanLuma = sum / nPx;
           stdLuma = Math.sqrt(Math.max(0, sumSq / nPx - meanLuma * meanLuma));
           activeBgDiffRatio = nonBgCount / nPx;
           frameDiff = prevPixels ? diffAcc / nPx : 0;
+          earlyVsLateDiff = earlyPixels ? earlyAcc / nPx : 0;
+          if (leftMass + rightMass > 0) {
+            leftMassShare = leftMass / (leftMass + rightMass);
+          }
           prevPixels = new Uint8ClampedArray(img);
+          if (sIdx === 0) earlyPixels = new Uint8ClampedArray(img);
 
-          // Sample actual background behind each text node using an 8-point perimeter ring around the ink box
-          // (avoids sampling the glyph ink itself!)
           for (const nd of snap.nodes) {
             if (nd.bg || !nd.text) continue;
             const ringPts = [
@@ -255,10 +278,14 @@ const rawSweep = await page.evaluate(async ({ scenes, width, height, duration })
         t: Number(pt.toFixed(3)),
         nodes: snap.nodes,
         nanErrors: snap.nanErrors,
+        shotPreset: snap.shotPreset || null,
+        cameraZoom: snap.cameraZoom || 1,
         meanLuma,
         stdLuma,
         activeBgDiffRatio,
         frameDiff,
+        earlyVsLateDiff,
+        leftMassShare,
         nodePixelBg,
       });
     }
@@ -523,20 +550,153 @@ for (const { scene, samples } of rawSweep) {
     }
   }
 
-  let penalty = 0;
-  for (const iss of issues) {
-    if (iss.severity === 'BLOCKER') { penalty += 22; blockerCount++; }
-    else penalty += 7;
+  // 8. Quadrant Visual-Mass Balance (16:9 horizontal composition balance)
+  if (width > height && midSample.activeBgDiffRatio > 0.04) {
+    const ls = midSample.leftMassShare ?? 0.5;
+    if (ls > 0.88 || ls < 0.12) {
+      addIssue(
+        'WARN',
+        'QUADRANT_IMBALANCE',
+        `Scene "${scene.id}" packs ${Math.round(Math.max(ls, 1 - ls) * 100)}% of visual mass on the ${ls > 0.5 ? 'LEFT' : 'RIGHT'} half, leaving the opposite side empty.`,
+        `Use MVS.shotLayout(safe, 'split-lr' | 'split-rl' | 'bento-command' | 'monumental-payoff') to balance foreground visual weight across the frame.`
+      );
+    }
   }
-  const score = Math.max(0, 100 - penalty);
+
+  // 9. Intra-Scene 3-Act Temporal Evolution (Early 22% vs Late 84% evolution check)
+  if (samples.length >= 4 && scene.duration >= 2.6) {
+    const evoDiff = samples[3].earlyVsLateDiff ?? 0;
+    const zoomDelta = Math.abs((samples[3].cameraZoom || 1) - (samples[0].cameraZoom || 1));
+    const nodeDelta = Math.abs((samples[3].nodes?.length || 0) - (samples[0].nodes?.length || 0));
+    if (evoDiff < 0.008 && zoomDelta < 0.03 && nodeDelta === 0) {
+      addIssue(
+        'WARN',
+        'FLAT_TEMPORAL_EVOLUTION',
+        `Scene "${scene.id}" shows minimal visual evolution over its ${scene.duration.toFixed(1)}s hold (early→late diff=${evoDiff.toFixed(4)}).`,
+        `Add an Act-II secondary beat via MVS.sceneActs(localT, duration): e.g. MVS.withCameraFocus(..., acts.act2Focus, 1.15, ...) or MVS.drawCallout(..., { localT, delay: 1.1 }).`
+      );
+    }
+  }
+
+  // Compute scene horizontal polarity & focal centroid for cross-scene Master Montage checks
+  const nonBgVisuals = (midSample.nodes || []).filter(
+    (n) => (n.role === 'diagram' || n.role === 'graphic' || n.role === 'card') && n.w * n.h < width * height * 0.80
+  );
+  const diagramsOnly = nonBgVisuals.filter((n) => n.role === 'diagram' || n.role === 'graphic');
+  const pool = diagramsOnly.length ? diagramsOnly : nonBgVisuals;
+  const heroVisual = pool.length
+    ? pool.reduce((best, cur) => (cur.w * cur.h > best.w * best.h ? cur : best), pool[0])
+    : null;
+  const gx = heroVisual ? heroVisual.x + heroVisual.w * 0.5 : width * 0.5;
+  let polarity = midSample.shotPreset || scene.shot || null;
+  if (!polarity) {
+    if (heroVisual && gx > width * 0.56) polarity = 'split-lr';
+    else if (heroVisual && gx < width * 0.44) polarity = 'split-rl';
+    else polarity = 'center-stage';
+  }
+
   sceneReports.push({
     sceneId: scene.id,
     range: `${scene.start.toFixed(2)}s..${(scene.start + scene.duration).toFixed(2)}s`,
-    score,
-    status: issues.some((i) => i.severity === 'BLOCKER') ? 'FAIL' : score >= minScore ? 'CLEAN' : 'NEEDS_POLISH',
-    issues: issues.slice(0, 3), // Cognitive Load Cap: Top-3 actionable fixes per scene!
-    totalIssueCount: issues.length,
+    polarity,
+    focalX: gx / width,
+    rawIssues: issues,
   });
+}
+
+// ============================================================================
+// CROSS-SCENE MASTER MONTAGE, EYE-TRACE & RHYTHM AUDIT
+// ============================================================================
+if (sceneReports.length >= 2) {
+  for (let i = 1; i < sceneReports.length; i++) {
+    const prevSc = scenes[i - 1];
+    const curSc = scenes[i];
+    const curRep = sceneReports[i];
+    const prevRep = sceneReports[i - 1];
+
+    const pushCross = (severity, code, message, fix) => {
+      if (curRep.rawIssues.some((x) => x.code === code)) return;
+      curRep.rawIssues.push({ severity, code, message, fix });
+    };
+
+    // A. Shot Framing / Polarity Monotony (3+ identical left/right splits in a row)
+    if (
+      i >= 2 &&
+      curRep.polarity === prevRep.polarity &&
+      curRep.polarity === sceneReports[i - 2].polarity &&
+      (curRep.polarity === 'split-lr' || curRep.polarity === 'split-rl')
+    ) {
+      const alt = curRep.polarity === 'split-lr' ? 'split-rl' : 'split-lr';
+      pushCross(
+        'BLOCKER',
+        'SHOT_POLARITY_MONOTONY',
+        `3 consecutive scenes ("${sceneReports[i - 2].sceneId}" → "${prevRep.sceneId}" → "${curRep.sceneId}") repeat the exact same "${curRep.polarity}" framing!`,
+        `Alternate shot composition in "${curRep.sceneId}" using MVS.shotLayout(safe, '${alt}') or 'macro-focus' / 'bento-command' / 'monumental-payoff'.`
+      );
+    }
+
+    // B. Transition Monotony (consecutive identical non-cut transitions)
+    const trCur = curSc.transition || 'whip';
+    const trPrev = prevSc.transition || 'whip';
+    if (i >= 2 && trCur !== 'cut' && trCur === trPrev) {
+      pushCross(
+        'WARN',
+        'TRANSITION_MONOTONY',
+        `Scenes "${prevSc.id}" and "${curSc.id}" repeat the same "${trCur}" wipe back-to-back.`,
+        `Vary montage transitions semantically across ['cut', 'whip', 'whip-right', 'push-up', 'portal', 'zoom-out', 'iris', 'dissolve'].`
+      );
+    }
+
+    // C. Consecutive Identical Visual Device
+    if (curSc.device && prevSc.device && curSc.device === prevSc.device) {
+      pushCross(
+        'WARN',
+        'DEVICE_REPETITION',
+        `Scene "${curSc.id}" repeats the exact same primary visual device ("${curSc.device}") as "${prevSc.id}".`,
+        `Choose a distinct visual device for "${curSc.id}" (e.g. drawGlobeWire, drawIsometricStack, drawAreaChart, drawBarChart, drawCodeCard, drawMetricCard, drawActor).`
+      );
+    }
+
+    // D. Walter Murch Eye-Trace Whiplash across unmotivated hard cut
+    if (trCur === 'cut' && Math.abs(curRep.focalX - prevRep.focalX) > 0.56) {
+      const sug = curRep.focalX < prevRep.focalX ? 'whip-right' : 'whip';
+      pushCross(
+        'WARN',
+        'EYE_TRACE_WHIPLASH',
+        `Hard 'cut' into "${curSc.id}" jumps viewer focal point by ${Math.round(Math.abs(curRep.focalX - prevRep.focalX) * 100)}% of screen width.`,
+        `Either use directional transition "${sug}" / "portal" to carry the eye, or align focal anchor closer to x=${Math.round(prevRep.focalX * width)}px.`
+      );
+    }
+
+    // E. Musical Beat-Grid Alignment (when BPM is set and no VO narration overrides cuts)
+    if (timeline?.bpm && !timeline?.audio?.vo && curSc.start > 0.01) {
+      const beatSec = 60 / Number(timeline.bpm);
+      const nearestBeat = Math.round(curSc.start / beatSec) * beatSec;
+      const errMs = Math.abs(curSc.start - nearestBeat) * 1000;
+      if (errMs > 68) {
+        pushCross(
+          'WARN',
+          'OFF_BEAT_CUT',
+          `Cut into "${curSc.id}" at ${curSc.start.toFixed(2)}s misses the ${timeline.bpm} BPM beat grid by ${Math.round(errMs)}ms.`,
+          `Snap scene "${curSc.id}" start to ${nearestBeat.toFixed(2)}s (or half-beat ${(Math.round(curSc.start / (beatSec * 0.5)) * beatSec * 0.5).toFixed(2)}s).`
+        );
+      }
+    }
+  }
+}
+
+// Finalize per-scene scores after cross-scene montage checks
+for (const sr of sceneReports) {
+  let penalty = 0;
+  for (const iss of sr.rawIssues) {
+    if (iss.severity === 'BLOCKER') { penalty += 22; blockerCount++; }
+    else penalty += 7;
+  }
+  sr.score = Math.max(0, 100 - penalty);
+  sr.status = sr.rawIssues.some((i) => i.severity === 'BLOCKER') ? 'FAIL' : sr.score >= minScore ? 'CLEAN' : 'NEEDS_POLISH';
+  sr.issues = sr.rawIssues.slice(0, 4);
+  sr.totalIssueCount = sr.rawIssues.length;
+  delete sr.rawIssues;
 }
 
 if (runtimeErrors.length > 0) blockerCount += runtimeErrors.length;
