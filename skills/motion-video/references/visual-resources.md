@@ -76,10 +76,29 @@ ctx.drawImage(glBg, 0, 0, W, H); // Composite onto main 2D stage!
 
 ---
 
-## 3. Sourced CC0 Archival Photos & PBR Textures (Documentary / 3D)
+## 3. Zero-Key HD Photography, Museum Art, Space Plates, 3D PBR & Video Sequences (`fetch_assets.mjs` v3.0)
 
-- **Wikimedia Commons API (Zero Key, Instant `<200ms`, Pre-Rasterized 1080p)**:
-  `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=Submarine_cable&gsrlimit=5&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1920&format=json&origin=*`
-  *(Always request `iiurlwidth=1920` so huge archival TIFFs/SVGs return ready-to-draw 1920px PNG/JPG URLs!)*
-- **PolyHaven CC0 API (3D PBR Textures, Models & HDRIs, Zero Key)**:
-  `https://api.polyhaven.com/assets?t=textures` → `https://api.polyhaven.com/files/{asset_id}` → direct `dl.polyhaven.org` URLs.
+Never trap every video inside vector diagrams! `scripts/fetch_assets.mjs` v3.0 pulls real studio assets across **every visual universe** with **zero API keys**, and `--bundle` packs images into `video/assets/assets-bundle.js` (`window.__MVS_ASSETS__`) for instant zero-CORS `file://` rendering via `await MVS.preloadBundle()`:
+
+```bash
+# 1. Historical, Cultural & Documentary HD Photography (Wikimedia Commons API)
+node <motion-video>/scripts/fetch_assets.mjs --out video/assets \
+  --wikimedia "Wright Flyer 1903,Montgolfier balloon,Concorde supersonic" --bundle
+
+# 2. Space, Earth, Astronomy & Science HD Plates (Official NASA Image Library)
+node <motion-video>/scripts/fetch_assets.mjs --out video/assets \
+  --nasa "Earth horizon sunrise,Carina Nebula,Apollo 11 moonwalk" --bundle
+
+# 3. Fine Art, Classical Paintings & Prints (The Met Open Access CC0 + Wikimedia Museum Scans)
+node <motion-video>/scripts/fetch_assets.mjs --out video/assets \
+  --art "Great Wave Kanagawa,Starry Night,Wanderer sea of fog" --bundle
+
+# 4. Photorealistic 3D Studio HDRI Lighting (.hdr) & 1K PBR Texture Maps (PolyHaven CC0)
+node <motion-video>/scripts/fetch_assets.mjs --out video/assets \
+  --polyhaven-hdri studio_small_09 \
+  --polyhaven-tex aerial_rocks_02
+
+# 5. Hybrid Cinema HD: Extract Real / Stock / AI Video Clip into Frame-Exact Sequence for seek(t)
+node <motion-video>/scripts/fetch_assets.mjs --out video/assets \
+  --extract-video raw_footage.mp4 --fps 30
+```

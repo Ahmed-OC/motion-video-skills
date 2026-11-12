@@ -1,10 +1,56 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Motion Video Timeline v2.0",
-  "description": "Single source of truth for a code-generated video: visuals, audio, transitions, envelopes, and smart captions all read cue times from here.",
+  "title": "Motion Video Timeline v3.0 — Universal Creative Studio",
+  "description": "Single source of truth for creative direction, emotional color script, optics, visuals, audio, transitions, and smart captions.",
   "type": "object",
   "required": ["fps", "duration", "width", "height", "scenes"],
   "properties": {
+    "creativeDirection": {
+      "type": "object",
+      "description": "Mandatory Phase-0 Creative Director brief (either answered with the user via clarify or self-authored autonomously before coding).",
+      "required": ["universe", "emotionalArc", "visualMetaphor", "signatureMoment", "forbiddenCliches"],
+      "properties": {
+        "universe": {
+          "type": "string",
+          "enum": [
+            "cinematic-film",
+            "documentary-archive",
+            "3d-photoreal",
+            "hybrid-cinema",
+            "luxury-editorial",
+            "storytelling-illustrated",
+            "kinetic-manifesto",
+            "saas-product",
+            "tech-architecture",
+            "data-journalism",
+            "stem-explainer",
+            "social-short",
+            "fine-art"
+          ]
+        },
+        "emotionalArc": { "type": "string", "description": "Scene-by-scene emotional & tonal progression." },
+        "visualMetaphor": { "type": "string", "description": "Central visual idea carrying the film." },
+        "typographyPairing": { "type": "string", "description": "Chosen Google Fonts pairing key or custom editorial duo." },
+        "signatureMoment": { "type": "string", "description": "The ONE bold, memorable directorial gesture (85% restraint / 15% audacity)." },
+        "soundPlan": { "type": "string", "description": "Score mood, VO tone, J-cut/L-cut swells, and dramatic silences." },
+        "forbiddenCliches": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicit anti-AI-slop rules for this film (e.g. 'NO UI cards', 'NO HUD brackets', 'NO Inter font')."
+        }
+      }
+    },
+    "optics": {
+      "type": "object",
+      "description": "Analog & cinema optical post-processing applied across the film.",
+      "properties": {
+        "letterbox": { "type": "string", "enum": ["none", "1.85:1", "2.00:1", "2.39:1"] },
+        "grain": { "type": "number", "minimum": 0, "maximum": 0.16 },
+        "vignette": { "type": "number", "minimum": 0, "maximum": 0.85 },
+        "halation": { "type": "number", "minimum": 0, "maximum": 0.25 },
+        "paperTexture": { "type": "boolean" }
+      }
+    },
     "fps": { "type": "number", "minimum": 1, "maximum": 120, "description": "Frames per second. Quantize scene durations to integer frames / fps." },
     "duration": { "type": "number", "exclusiveMinimum": 0, "description": "Total duration in seconds (durationInFrames = round(duration * fps))." },
     "width": { "type": "integer", "minimum": 16 },
@@ -57,7 +103,10 @@
             "description": "Motivated montage transition into this scene."
           },
           "suppressCaptions": { "type": "boolean", "description": "Suppress bottom captions when scene displays full-screen kinetic text." },
-          "palette": { "type": "array", "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" } },
+          "palette": {
+            "type": ["array", "object"],
+            "description": "Per-scene Emotional Color Script override (e.g. { bg, fg, accent, muted }) or hex array."
+          },
           "cueTimes": { "type": "array", "items": { "type": "number" } }
         }
       }

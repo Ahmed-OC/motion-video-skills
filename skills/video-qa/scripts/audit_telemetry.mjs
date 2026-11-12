@@ -194,7 +194,7 @@ const rawSweep = await page.evaluate(async ({ scenes, width, height, duration })
 
       const snap = window.__MVS_TELEMETRY__
         ? window.__MVS_TELEMETRY__.snapshot()
-        : { nodes: [], nanErrors: [], shotPreset: null, cameraZoom: 1 };
+        : { nodes: [], nanErrors: [], shotPreset: null, cameraZoom: 1, cliches: [] };
 
       let meanLuma = 0;
       let stdLuma = 0;
@@ -212,9 +212,12 @@ const rawSweep = await page.evaluate(async ({ scenes, width, height, duration })
           const nPx = thumbW * thumbH;
           let sum = 0;
           let sumSq = 0;
-          const cR = (img[0] + img[(thumbW - 1) * 4]) * 0.5;
-          const cG = (img[1] + img[(thumbW - 1) * 4 + 1]) * 0.5;
-          const cB = (img[2] + img[(thumbW - 1) * 4 + 2]) * 0.5;
+          const sampleRow = Math.min(thumbH - 1, Math.round(thumbH * 0.16));
+          const rowLeft = (sampleRow * thumbW + 2) * 4;
+          const rowRight = (sampleRow * thumbW + (thumbW - 3)) * 4;
+          const cR = (img[rowLeft] + img[rowRight]) * 0.5;
+          const cG = (img[rowLeft + 1] + img[rowRight + 1]) * 0.5;
+          const cB = (img[rowLeft + 2] + img[rowRight + 2]) * 0.5;
           let nonBgCount = 0;
           let diffAcc = 0;
           let earlyAcc = 0;
@@ -361,6 +364,25 @@ const safeBox = isPortrait(width, height)
       portrait: false,
     };
 
+const creativeDir = timeline?.creativeDirection || null;
+const universe = String(creativeDir?.universe || timeline?.meta?.universe || '').toLowerCase();
+const NON_DASHBOARD_UNIVERSES = new Set([
+  'cinematic-film',
+  'documentary-archive',
+  'luxury-editorial',
+  'storytelling-illustrated',
+  '3d-photoreal',
+  'hybrid-cinema',
+  'fine-art',
+]);
+const MINIMAL_FRIENDLY_UNIVERSES = new Set([
+  'cinematic-film',
+  'luxury-editorial',
+  'kinetic-manifesto',
+  'storytelling-illustrated',
+  'hybrid-cinema',
+]);
+
 const sceneReports = [];
 let blockerCount = 0;
 
@@ -374,7 +396,16 @@ for (const { scene, samples } of rawSweep) {
     issues.push({ severity: sev, code, message, fix });
   };
 
-  // 1. Runtime / NaN canvas check
+  if (scene.index === 0 && timeline && !creativeDir) {
+    addIssue(
+      'WARN',
+      'MISSING_CREATIVE_DIRECTION',
+      `timeline.json has no "creativeDirection" brief — autonomous director thinking was skipped.`,
+      `Add timeline.creativeDirection ({ universe, emotionalArc, visualMetaphor, typographyPairing, signatureMoment, forbiddenCliches }) before coding scenes.`
+    );
+  }
+
+  // 1. Runtime / NaN canvas check & Anti-AI-Slop Cliché Enforcement
   for (const smp of samples) {
     if (smp.nanErrors.length > 0) {
       const e = smp.nanErrors[0];
@@ -385,19 +416,32 @@ for (const { scene, samples } of rawSweep) {
         `Replace raw division / underdamped ζ>=1 math with MVS.spring(t, f0, zeta) or MVS.clamp(v, 0, 1).`
       );
     }
+    if (NON_DASHBOARD_UNIVERSES.has(universe) && Array.isArray(smp.cliches) && smp.cliches.length > 0) {
+      addIssue(
+        'BLOCKER',
+        'CLICHE_VIOLATION',
+        `Scene "${scene.id}" uses SaaS/Sci-Fi widget (${smp.cliches.join(', ')}) inside universe "${universe}"!`,
+        `Remove MVS.drawMetricCard / MVS.drawHudOverlay! In "${universe}", use frameless editorial type (MVS.drawTextAutoFit), archival/cinema plates (MVS.drawImagePlate), or organic highlighters (MVS.drawHighlighter).`
+      );
+    }
   }
 
   // Evaluate settled midpoint sample (`samples[1]` or `samples[2]`) for geometry, contrast & density
   const midSample = samples[1] || samples[0];
+  const isIntentionalMinimal =
+    scene.shot === 'monumental-payoff' ||
+    midSample?.shotPreset === 'monumental-payoff' ||
+    MINIMAL_FRIENDLY_UNIVERSES.has(universe);
+
   if (midSample) {
     if (midSample.stdLuma < 2.2 && midSample.nodes.length === 0) {
       addIssue(
         'BLOCKER',
         'BLANK_FRAME',
         `t=${midSample.t}s: Frame is visually blank (luma stdDev=${midSample.stdLuma.toFixed(2)}).`,
-        `Ensure scene "${scene.id}" draws a backdrop (MVS.drawBackdrop) and visible focal elements at localT=${(midSample.t - scene.start).toFixed(2)}s.`
+        `Ensure scene "${scene.id}" draws a backdrop or image plate and visible focal elements at localT=${(midSample.t - scene.start).toFixed(2)}s.`
       );
-    } else if (midSample.activeBgDiffRatio < 0.04 && midSample.nodes.length <= 2) {
+    } else if (!isIntentionalMinimal && midSample.activeBgDiffRatio < 0.04 && midSample.nodes.length <= 2) {
       addIssue(
         'WARN',
         'SCENE_TOO_SPARSE',
@@ -485,6 +529,7 @@ for (const { scene, samples } of rawSweep) {
       }
 
       // 4. Real WCAG Contrast Check
+      if (nd.skipContrast) continue;
       const fgRgb = parseRgb(nd.fg);
       const bgRgb = parseRgb(nd.bg || midSample.nodePixelBg[nd.id]);
       if (fgRgb && bgRgb) {
@@ -550,8 +595,8 @@ for (const { scene, samples } of rawSweep) {
     }
   }
 
-  // 8. Quadrant Visual-Mass Balance (16:9 horizontal composition balance)
-  if (width > height && midSample.activeBgDiffRatio > 0.04) {
+  // 8. Quadrant Visual-Mass Balance (16:9 horizontal composition balance; skipped on intentional minimalist / cinema asymmetrical frames)
+  if (!isIntentionalMinimal && width > height && midSample.activeBgDiffRatio > 0.04) {
     const ls = midSample.leftMassShare ?? 0.5;
     if (ls > 0.88 || ls < 0.12) {
       addIssue(

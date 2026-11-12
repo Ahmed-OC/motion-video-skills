@@ -22,8 +22,28 @@ type Rect = { x: number; y: number; w: number; h: number };
 // ({ ctx, t, localT, duration, progress, acts, width, height, safe, theme, scene }) => void
 //   where acts = { progress, act1Enter, act2Focus, act3Exit, focusPulse }
 
-MVS.getTheme(name) // 'linear-dark'|'swiss-brutalist'|'paperclip-cn'|'cyber-fui-jp'|'kurzgesagt-pop'|'riso-editorial'|'deep-ocean-atlas'|'apple-keynote'
-// theme fields: { bg, bgAlt, surface, surfaceHi, border, fg, muted, accent, accent2, ok, warn, fontDisplay, fontBody, fontMono }
+MVS.getTheme(name)
+// Tech/Design themes: 'linear-dark'|'swiss-brutalist'|'paperclip-cn'|'cyber-fui-jp'|'kurzgesagt-pop'|'riso-editorial'|'deep-ocean-atlas'|'apple-keynote'
+// Cinema/Story/Luxury themes: 'cinema-a24'|'documentary-vox'|'luxury-editorial'|'warm-story'|'noir-chiaroscuro'|'sakura-anime'
+
+// Typography & Offline Asset Bundle Preloaders (call inside `window.onReady = async () => { ... }`)
+await MVS.loadGoogleFonts(pairingKey) // 'cinema-a24'|'documentary-vox'|'luxury-editorial'|'warm-story'|'swiss-poster'|'brutalist-syne'|'classic-literary'|'tech-precision'|'jp-mincho'|'kr-editorial'|'cn-humanist'
+await MVS.preloadBundle() // decodes all HD photos/art/SVGs packed in `./assets/assets-bundle.js` (`fetch_assets.mjs --bundle`)!
+
+// Cinema, Documentary, Multiplane 2.5D & Analog Optics (FOR NON-TECH FILMS — NO UI CARDS!)
+MVS.drawImagePlate(ctx, assetKey, rect, {
+  id?: string, theme, localT, progress /* 0..1 */,
+  style?: 'full-bleed' | 'archival-plate' | 'editorial-frame' | 'knockout-type',
+  scrim?: 'left' | 'right' | 'bottom' | 'cinema', scrimStrength?: 0.78, // readable frameless text without boxes!
+  zoomFrom?: 1.02, zoomTo?: 1.11, panFromX?: -0.02, panToX?: 0.02,
+  tiltDeg?: -1.4, caption?: 'ARCHIVE · 1903', // for 'archival-plate'
+  text?: '1903', fontPx?: 220 // for 'knockout-type' hero photo-masked display letters!
+})
+MVS.drawHighlighter(ctx, rect, progress /* 0..1 */, color /* e.g. '#EAB308' */, { alpha?: 0.34 }) // Vox live ink marker!
+MVS.applyCinemaOptics(ctx, width, height, t, { letterbox?: '2.39:1'|'1.85:1'|'none', grain?: 0.042, vignette?: 0.35, halation?: 0.06, paperTexture?: boolean })
+// (Note: setting `"optics": { "letterbox": "2.39:1", "grain": 0.042, "vignette": 0.36 }` in timeline.json applies optics + adjusts `safe` automatically!)
+
+MVS.synthCinemaScore({ mood: 'cinema-strings'|'documentary-felt'|'minimal-luxury'|'tech-pulse', bpm?: 76, duration: number, cues?: number[], jCutSec?: 0.38 })
 
 // Master Cinematographic Shot Topologies (USE THESE — NEVER repeat 'split-lr' 3 scenes in a row!)
 MVS.shotLayout(safe, preset)

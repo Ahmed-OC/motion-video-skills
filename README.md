@@ -1,86 +1,49 @@
-# motion-video-skills v2.0
+# motion-video-skills v3.0 — Universal Creative Studio
 
-Universal studio-grade **Video-as-Code** agent skills (`frame = f(t)`) — engineered so **both Frontier models AND fast/smaller models** (e.g. `gemini-3.8-flash`, `gemini-2.5-flash`, `Haiku`, `DeepSeek-Flash`, `Qwen-Coder`) produce broadcast-ready, collision-free, **BT.709 / −14 LUFS** MP4 videos across all 10 motion genres.
+Deterministic **Video-as-Code** (`frame = f(t)`) studio suite engineered so **both Frontier models AND fast/smaller models** (`gemini-3.8-flash`, `Haiku`, `DeepSeek-Flash`, `Qwen-Coder`) produce **human-studio-grade BT.709 / −14 LUFS MP4 films** across **every video universe** — **without ever looking AI-generated**:
+- **2.39:1 Cinema & Historical Documentary** (*A24, Vox, Arte, Ken Burns* — real HD archives, 35mm grain, Editorial Serif, J-cut strings, zero UI boxes)
+- **Photorealistic 3D PBR & Hybrid HD Cinema** (*Three.js AgX + PolyHaven HDRIs, Headless Blender 4.x Cycles, deterministic FFmpeg video-frame sequences*)
+- **Luxury Editorial, Emotional Storytelling & Kinetic Manifestos** (*85% restraint / 15% signature gesture, Emotional Color Scripts, Ma negative space*)
+- **SaaS Product Launches, 2.5D Tech Architecture, Data Journalism, STEM & 9:16 Social Shorts**
 
-| `gemini-3.8-flash` + v2.0 (`Track S` + 2 Compiler Passes) | Frontier Studio (`Track F` Bespoke WebGL2 + 3D Cutaway) |
+| `gemini-3.8-flash` + v3.0 (`2.39:1` Archival Cinema — *Zero UI Cards!*) | `gemini-3.8-flash` + v3.0 (2.5D Tech & Master Montage) |
 |---|---|
-| ![Flash v2 Globe](examples/subsea-globe-flash-v2.jpg) | ![Frontier v2 Cable](examples/subsea-cable-frontier-v2.jpg) |
+| ![Cinema Kitty Hawk v3](examples/cinema-kittyhawk-flash-v3.jpg) | ![Flash v2 Globe](examples/subsea-globe-flash-v2.jpg) |
 
-![Flash v2 Contact Sheet](examples/contact-sheet-flash-v2.jpg)
+![Cinema v3 Contact Sheet](examples/contact-sheet-cinema-v3.jpg)
 
 ---
 
 ## Install
 
-### Option 1 — `skills` CLI ([skills.sh](https://skills.sh))
-
 ```bash
 npx skills add Ahmed-OC/motion-video-skills
-```
-
-### Option 2 — `curl | bash` (Zero Node / Hermes / Claude Code / Cursor / Codex / ZCode)
-
-```bash
+# Or universal curl installer (Hermes Agent / Claude Code / Cursor / Codex / ZCode):
 curl -fsSL https://raw.githubusercontent.com/Ahmed-OC/motion-video-skills/main/install.sh | bash
-# Or install into a custom directory (e.g. Hermes Agent):
-curl -fsSL https://raw.githubusercontent.com/Ahmed-OC/motion-video-skills/main/install.sh | bash -s -- ~/.hermes/skills
 ```
 
 Installs **three composable skills**:
 
-| Skill | Role in v2.0 |
+| Skill | Role in v3.0 |
 |---|---|
-| **`motion-video`** | End-to-end deterministic generator (`window.seek(t)`), **10-genre router**, **`motion-kit.js` (`window.MVS`)** auto-layout/spring/OKLCH/chart/globe/2.5D/shader SDK, **`fetch_assets.mjs`** zero-key vector downloader, parallel multi-worker **BT.709** `render_frames.mjs`. |
-| **`video-qa`** | **`audit_telemetry.mjs`** (`< 2.5s` headless Chromium visual & geometric compiler with `LOCKED CLEAN SCENES` anti-regression guard), `disco.mjs` temporal cut/freeze audit, `post.mjs` 2-pass linear **−14 LUFS** + BT.709 VUI tagger, and VLM-grounded `contact_sheet.sh`. |
-| **`tts-voiceover`** | VO-first multi-scene narration (`--scenes-json`), smart **FR / EN / CJK** 3-pass caption segmenter (French elisions `l'océan`, narrow non-breaking spaces, Kinsoku, zero orphan proclitics), and per-frame `[rms, bass, high]` audio envelopes (`vo_gen.py`). |
+| **`motion-video`** | **Phase-0 Creative Director Protocol** (asks via `clarify` when interactive, or self-authors `creativeDirection` autonomously), **Multi-Universe Router**, **`motion-kit.js` v3.0 (`window.MVS`)**, **`fetch_assets.mjs` v3.0** (Wikimedia HD, NASA HD, Met Museum CC0, PolyHaven 3D HDRI/PBR, FFmpeg frame sequences, icons/logos), and parallel **BT.709** `render_frames.mjs`. |
+| **`video-qa`** | **`audit_telemetry.mjs` v3.0** (`< 3s` 17-gate context-aware visual, temporal, montage & anti-cliché compiler with `LOCKED CLEAN SCENES`), `disco.mjs`, `post.mjs` (**−14 LUFS** + BT.709 VUI), and `contact_sheet.sh`. |
+| **`tts-voiceover`** | VO-first multi-scene narration (`--scenes-json`), **FR / EN / CJK** smart 3-pass caption segmenter, and per-frame `[rms, bass, high]` audio envelopes (`vo_gen.py`). |
 
 ---
 
-## Why v2.0? Closing the Small-Model vs Frontier Gap
+## What Makes v3.0 Never Look "AI-Generated"
 
-Controlled empirical benchmark on the exact same 4-scene, 15s, 1080p@30fps tech/science brief (*"THE SUBSEA INTERNET"* — globe + 4-layer subsea cable anatomy + 2014–2026 Tbps chart + EDFA optical repeater code):
-
-| Metric | `gemini-3.8-flash` + v1.0 | `gemini-3.8-flash` + v2.0 (`Track S`, 2 passes) | Frontier + v2.0 (`Track F`) |
-|---|---|---|---|
-| **Pre-render Telemetry (`audit_telemetry.mjs`)** | `88/100` (**FAIL**: text collision + 3 safe-zone breaches) | **Iter 1**: `84/100` (3 beam crossings caught in `2.7s`) → **Iter 2**: **`100/100` (`0` blockers)** | **`100/100` (`0` blockers)** |
-| **Fresh-Page Determinism (`stills.mjs --determinism`)** | PASS | **PASS** (100% SHA-256 identical) | **PASS** (100% SHA-256 identical w/ WebGL2) |
-| **Audio Stem & Mastering (`post.mjs`)** | **SILENT** (`Blob` return bug dropped audio) | **48 kHz Stereo AAC · −14.3 LUFS / −1.5 dBTP** | **48 kHz Stereo AAC · −14.3 LUFS / −1.5 dBTP** |
-| **Temporal Continuity (`disco.mjs`)** | **2.27s dead freeze** (`4.77s → 7.00s`) | **0 spikes · 0 freezes (`PASS`)** | **0 spikes · 0 freezes (`PASS`)** |
-| **Visual Architecture** | Flat circles on `#050B14` void + duplicate captions | 3D continental globe + 2.5D exploded stack + scrub chart + IDE card | WebGL2 aurora shader + 3D cutaway cylinder + IDE card |
-
-See [`docs/BENCHMARK_AND_ARCHITECTURE_V2.md`](docs/BENCHMARK_AND_ARCHITECTURE_V2.md) for the full methodology, SOTA research synthesis (US, China `#Vibe知识大赏` / `VibeVideoBench`, Japan *Moji-PV* *Kire/Yoin*, Korea Hangul), and mathematical fixes.
-
----
-
-## What Ships in v2.0
-
-### 1. `window.MVS` (`skills/motion-video/assets/motion-kit.js`)
-Zero-dependency studio runtime + automatic Canvas/DOM telemetry (`__MVS_TELEMETRY__`):
-- **3-Regime Exact Analytical Springs**: Underdamped (`ζ < 1`), critical (`ζ = 1`), and overdamped (`ζ > 1`) clamped on **total mechanical energy** (never `NaN` at `ζ >= 1`, never freezes mid-flight at `x = 1`), Apple perceptual `(duration, bounce)` parameterization, $C^1$ additive retargeting, Newton-Raphson `cubicBezier`, *Kire/Tame-Tsume* easings, golden-ratio `idleNoise`, and logarithmic `expZoom`.
-- **Perceptual Color Science (`OKLCH`)**: Ottosson OKLCH converter & mixer (zero muddy gray gradients), hue-shifted Kurzgesagt shadow/highlight pairs, and 8 curated studio themes (`linear-dark`, `swiss-brutalist`, `paperclip-cn`, `cyber-fui-jp`, `kurzgesagt-pop`, `riso-editorial`, `deep-ocean-atlas`, `apple-keynote`).
-- **Collision-Free Auto-Layout & CJK-Safe Typography**: `computeSafeZone` (16:9 broadcast + 2026 9:16 TikTok/Reels/Shorts L-shaped UI envelope), `vstack`, `hstack`, `bentoGrid`, and 7-step binary-searched `drawTextAutoFit` with balanced line wrapping and *Kinsoku* rules.
-- **10 Genre Visual Primitives**: `drawGlobeWire` (with continental silhouettes + 3D great-circle slerp arcs), `drawIsometricStack` (`等轴测沙盘`), `drawFlowBeam` (`流光`), `drawAreaChart`, `drawBarChart`, `drawMetricCard`, `drawCodeCard`, `drawActor`, `createShaderBackdrop` (WebGL2 Stripe mesh, gyroid aurora, `fwidth` grid), and `synthStudioAudio` (Paul Kellet pink noise + neo-soul chords + `-4.5 dB` vocal-formant carve).
-
-### 2. `< 2.5s` Pre-Render Visual Compiler (`skills/video-qa/scripts/audit_telemetry.mjs`)
-Sweeps ~75 stratified timestamps in headless Chromium memory **before encoding MP4**:
-- Traps silent `NaN`/`Infinity` Canvas arguments, pairwise AABB text/card collisions (computing exact `+Δy` Minimum Separation Vectors), `BEAM_CROSSES_CONTENT` line intersections, real pixel-ring WCAG contrast (solving the exact `#HEX` for `5.5:1`), 2026 safe-zone breaches, blank/sparse "black void" frames, static holds, and duplicate captions.
-- Outputs `🔒 LOCKED CLEAN SCENES` so iterative repairs by smaller models never regress scenes that already passed.
-
-### 3. Zero-Key Vector Asset Fetcher (`skills/motion-video/scripts/fetch_assets.mjs`)
-Downloads deterministic local SVGs/TopoJSON with **zero API keys**: Iconify (200k Lucide/Phosphor/Solar icons), SVGL & Simple Icons brand logos, palette-recolored unDraw vector scenes, DiceBear CC0 characters (`open-peeps`, `notionists`), and Natural Earth `countries-110m.json`.
-
----
-
-## Runtime Prerequisites
-
- Only needed when rendering frames/audio locally:
-
-```bash
-node --version                                    # ≥ 18
-npm i -D playwright && npx playwright install chromium   # or global playwright-core + ms-playwright cache
-ffmpeg -version                                   # H.264 +BT.709 + EBU R128 loudnorm
-pip install -U edge-tts                           # optional: free neural voiceover + word timings
-```
+1. **Mandatory Phase-0 Creative Director Thinking (`creativeDirection`)**:
+   - When interactive and the prompt is open, the agent asks 3–4 sharp creative questions first.
+   - When autonomous, the agent **must ask those 5 questions to itself** inside `timeline.json -> creativeDirection` (`universe`, `emotionalArc`, `visualMetaphor`, `typographyPairing`, `signatureMoment` obeying the **85% restraint / 15% audacity law**, and `forbiddenCliches`) *before* coding scenes.
+2. **`Physics Strict, Aesthetics Plural` (`motion-kit.js` v3.0)**:
+   - **Strict Invisible Laws**: 3-regime analytical springs (zero `NaN`), OKLCH color mixing, collision-free `shotLayout` (6 topologies), 8 motivated transitions, 3-act intra-scene camera focus (`withCameraFocus` lens-clipped), and CJK-safe binary-searched typography.
+   - **Plural Visible Worlds**: 14 themes (`cinema-a24`, `documentary-vox`, `luxury-editorial`, `warm-story`, `noir-chiaroscuro`, `sakura-anime`, `swiss-brutalist`, `paperclip-cn`, `linear-dark`, etc.), **12 Google Fonts pairings** (`loadGoogleFonts`), **per-scene Emotional Color Scripts**, `drawImagePlate` (`full-bleed` chiaroscuro, tilted museum `archival-plate`, `knockout-type` photo-masked letters), `drawHighlighter`, **35mm film grain + halation + `2.39:1` letterbox** (`applyCinemaOptics`), and **J-Cut bowed cinema strings / felt piano** (`synthCinemaScore`).
+3. **17-Gate Context-Aware Compiler (`audit_telemetry.mjs` v3.0)**:
+   - Catches AABB overlaps (`+Δy px`), beam crossings, WCAG contrast, safe-zones, frozen holds, `SHOT_POLARITY_MONOTONY`, `TRANSITION_MONOTONY`, `EYE_TRACE_WHIPLASH`, and `OFF_BEAT_CUT` — while **respecting intentional *Ma* minimalism** on Cinema/Luxury frames and blocking SaaS UI cards/HUD inside non-tech films via **`CLICHE_VIOLATION`**!
+4. **Zero-Key Multi-Universe Asset Fetcher (`fetch_assets.mjs` v3.0)**:
+   - Real HD historical/documentary photos (`--wikimedia`), NASA space/Earth plates (`--nasa`), Metropolitan Museum CC0 fine art (`--art`), PolyHaven CC0 2K `.hdr` lighting & PBR maps (`--polyhaven-hdri`, `--polyhaven-tex`), deterministic video frame extraction (`--extract-video`), plus Iconify, SVGL, unDraw, DiceBear, Natural Earth, and zero-CORS `--bundle`!
 
 ## License
 

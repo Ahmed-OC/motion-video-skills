@@ -342,13 +342,108 @@
       fontBody: '"Inter", sans-serif',
       fontMono: '"JetBrains Mono", monospace',
     },
+    'cinema-a24': {
+      bg: '#090807', bgAlt: '#12100E', surface: '#181512', surfaceHi: '#241F1A',
+      border: 'rgba(243,237,226,0.14)', fg: '#F3EDE2', muted: '#B5AA99',
+      accent: '#D4A359', accent2: '#A33B20', warn: '#D97706', ok: '#65A30D',
+      fontDisplay: '"Cormorant Garamond", "Playfair Display", Georgia, serif',
+      fontBody: '"Plus Jakarta Sans", "Helvetica Neue", sans-serif',
+      fontMono: '"Space Mono", "JetBrains Mono", monospace',
+    },
+    'documentary-vox': {
+      bg: '#F3EFE6', bgAlt: '#E7E0D2', surface: '#FAF7F0', surfaceHi: '#EFE8D8',
+      border: 'rgba(23,22,20,0.15)', fg: '#171614', muted: '#57534E',
+      accent: '#EAB308', accent2: '#C2410C', warn: '#B45309', ok: '#15803D',
+      fontDisplay: '"Newsreader", "Fraunces", Georgia, serif',
+      fontBody: '"Work Sans", system-ui, sans-serif',
+      fontMono: '"IBM Plex Mono", monospace',
+    },
+    'luxury-editorial': {
+      bg: '#FAF7F2', bgAlt: '#F0EAE0', surface: '#FFFFFF', surfaceHi: '#F5EFE6',
+      border: 'rgba(20,19,18,0.10)', fg: '#141312', muted: '#6B655E',
+      accent: '#8C6D46', accent2: '#2C3E35', warn: '#A16207', ok: '#166534',
+      fontDisplay: '"Instrument Serif", "Cormorant Garamond", Georgia, serif',
+      fontBody: '"Plus Jakarta Sans", "Helvetica Neue", sans-serif',
+      fontMono: '"Space Mono", monospace',
+    },
+    'warm-story': {
+      bg: '#191310', bgAlt: '#241B16', surface: '#2E221C', surfaceHi: '#3B2C24',
+      border: 'rgba(253,246,236,0.13)', fg: '#FDF6EC', muted: '#C9B8A6',
+      accent: '#E07A5F', accent2: '#F2CC8F', warn: '#F4A261', ok: '#81B29A',
+      fontDisplay: '"Fraunces", Georgia, serif',
+      fontBody: '"Outfit", system-ui, sans-serif',
+      fontMono: '"Space Mono", monospace',
+    },
+    'noir-chiaroscuro': {
+      bg: '#050505', bgAlt: '#0E0E0E', surface: '#161616', surfaceHi: '#222222',
+      border: 'rgba(234,230,223,0.14)', fg: '#EAE6DF', muted: '#8C8881',
+      accent: '#DC2626', accent2: '#F59E0B', warn: '#EA580C', ok: '#10B981',
+      fontDisplay: '"Syne", "Bodoni Moda", Georgia, serif',
+      fontBody: '"Inter", sans-serif',
+      fontMono: '"IBM Plex Mono", monospace',
+    },
+    'sakura-anime': {
+      bg: '#FFF9FB', bgAlt: '#FCEEF4', surface: '#FFFFFF', surfaceHi: '#FDF2F8',
+      border: 'rgba(30,27,46,0.12)', fg: '#1E1B2E', muted: '#645E78',
+      accent: '#EC4899', accent2: '#0284C7', warn: '#F59E0B', ok: '#10B981',
+      fontDisplay: '"Shippori Mincho", "Noto Serif JP", Georgia, serif',
+      fontBody: '"Noto Sans JP", system-ui, sans-serif',
+      fontMono: '"JetBrains Mono", monospace',
+    },
   };
+
+  const FONT_PAIRINGS = {
+    'cinema-a24': ['Cormorant+Garamond:ital,wght@0,600;0,700;1,600', 'Plus+Jakarta+Sans:wght@400;600', 'Space+Mono:wght@400;700'],
+    'documentary-vox': ['Newsreader:ital,opsz,wght@0,6..72,600;0,6..72,700;1,6..72,600', 'Work+Sans:wght@400;600;700', 'IBM+Plex+Mono:wght@500'],
+    'luxury-editorial': ['Instrument+Serif:ital@0;1', 'Plus+Jakarta+Sans:wght@400;500;600'],
+    'warm-story': ['Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600', 'Outfit:wght@400;600'],
+    'swiss-poster': ['Archivo+Black', 'Inter:wght@400;600;700', 'IBM+Plex+Mono:wght@500'],
+    'brutalist-syne': ['Syne:wght@700;800', 'Space+Mono:wght@400;700'],
+    'classic-literary': ['Playfair+Display:ital,wght@0,600;0,700;1,600', 'Source+Sans+3:wght@400;600'],
+    'tech-precision': ['Space+Grotesk:wght@600;700', 'Inter:wght@400;500;600', 'JetBrains+Mono:wght@500;600'],
+    'jp-mincho': ['Shippori+Mincho:wght@600;700;800', 'Noto+Sans+JP:wght@400;600'],
+    'kr-editorial': ['Nanum+Myeongjo:wght@700;800', 'IBM+Plex+Sans+KR:wght@400;600'],
+    'cn-humanist': ['Noto+Serif+SC:wght@600;700', 'Noto+Sans+SC:wght@400;600'],
+    'handdrawn-sketch': ['Caveat:wght@600;700', 'Plus+Jakarta+Sans:wght@400;600'],
+  };
+
+  async function loadGoogleFonts(pairingOrSpecs, timeoutMs = 2500) {
+    if (typeof document === 'undefined') return;
+    const families = Array.isArray(pairingOrSpecs)
+      ? pairingOrSpecs
+      : (FONT_PAIRINGS[pairingOrSpecs] || FONT_PAIRINGS['cinema-a24']);
+    const query = families.map((f) => `family=${f}`).join('&');
+    const href = `https://fonts.googleapis.com/css2?${query}&display=swap`;
+    if (!document.querySelector(`link[href="${href}"]`)) {
+      await new Promise((resolve) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        const timer = setTimeout(resolve, timeoutMs);
+        link.onload = () => { clearTimeout(timer); resolve(); };
+        link.onerror = () => { clearTimeout(timer); resolve(); };
+        document.head.appendChild(link);
+      });
+    }
+    if (document.fonts && document.fonts.ready) {
+      await Promise.race([
+        document.fonts.ready,
+        new Promise((r) => setTimeout(r, timeoutMs)),
+      ]);
+    }
+  }
 
   function getTheme(nameOrObj) {
     if (nameOrObj && typeof nameOrObj === 'object') {
-      return { ...THEMES['linear-dark'], ...nameOrObj };
+      const base = nameOrObj.base ? (THEMES[nameOrObj.base] || THEMES['linear-dark']) : THEMES['linear-dark'];
+      return { ...base, ...nameOrObj };
     }
     return THEMES[nameOrObj] || THEMES['linear-dark'];
+  }
+
+  function resolveSceneTheme(baseTheme, scene) {
+    if (!scene || !scene.palette || typeof scene.palette !== 'object') return baseTheme;
+    return { ...baseTheme, ...scene.palette };
   }
 
   // ============================================================================
@@ -359,6 +454,7 @@
     sceneId: null,
     shotPreset: null,
     cameraZoom: 1,
+    cliches: [],
     nanErrors: [],
     nodes: [],
   };
@@ -489,8 +585,12 @@
       frameRegistry.sceneId = sceneId;
       frameRegistry.shotPreset = null;
       frameRegistry.cameraZoom = 1;
+      frameRegistry.cliches = [];
       frameRegistry.nanErrors = [];
       frameRegistry.nodes = [];
+    },
+    markCliche(tag) {
+      if (tag && !frameRegistry.cliches.includes(tag)) frameRegistry.cliches.push(tag);
     },
     setScene(sceneId) {
       frameRegistry.sceneId = sceneId;
@@ -1080,6 +1180,7 @@
   }
 
   function drawMetricCard(ctx, rect, opts = {}) {
+    TELEMETRY.markCliche('ui-metric-card');
     const theme = getTheme(opts.theme);
     const localT = opts.localT ?? 2;
     const delay = opts.delay || 0;
@@ -1796,6 +1897,7 @@
    * Japanese FUI Monitor Graphics Hairline Overlay (0.12 / 0.38 / 1.0 strict opacity hierarchy).
    */
   function drawHudOverlay(ctx, width, height, t, opts = {}) {
+    TELEMETRY.markCliche('hud-chrome');
     const theme = getTheme(opts.theme);
     const m = Math.round(Math.min(width, height) * 0.032);
     const len = 18;
@@ -2118,11 +2220,322 @@
     ctx.restore();
   }
 
+  // ============================================================================
+  // 10B. CINEMA, DOCUMENTARY, MULTIPLANE 2.5D & ANALOG OPTICS STUDIO
+  // ============================================================================
+  let _grainTileCanvas = null;
+  function getFilmGrainTile() {
+    if (_grainTileCanvas || typeof document === 'undefined') return _grainTileCanvas;
+    const size = 192;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const gctx = c.getContext('2d');
+    const img = gctx.createImageData(size, size);
+    const d = img.data;
+    const rand = mulberry32(0x3500f117);
+    for (let i = 0; i < d.length; i += 4) {
+      // Gaussian-like 2-sample sum centered at 128 for organic Kodak Vision3 luminance grain
+      const v = Math.round(clamp(((rand() + rand()) * 0.5) * 255, 0, 255));
+      d[i] = v;
+      d[i + 1] = Math.max(0, v - 3);
+      d[i + 2] = Math.max(0, v - 7);
+      d[i + 3] = 255;
+    }
+    gctx.putImageData(img, 0, 0);
+    _grainTileCanvas = c;
+    return c;
+  }
+
+  function computeLetterboxBar(W, H, ratioSpec) {
+    if (!ratioSpec || ratioSpec === 'none' || H > W) return 0;
+    let targetAspect = 0;
+    if (ratioSpec === '2.39:1' || ratioSpec === 'anamorphic' || ratioSpec === 2.39) targetAspect = 2.39;
+    else if (ratioSpec === '2.00:1' || ratioSpec === 'univisium') targetAspect = 2.0;
+    else if (ratioSpec === '1.85:1') targetAspect = 1.85;
+    if (!targetAspect) return 0;
+    const activeH = Math.round(W / targetAspect);
+    return Math.max(0, Math.round((H - activeH) * 0.5));
+  }
+
+  /**
+   * Applies organic cinema & editorial optics: 35mm film grain, paper linen fibers,
+   * warm chiaroscuro vignette, subtle halation glow, and 2.39:1 / 1.85:1 cinema mattes.
+   */
+  function applyCinemaOptics(ctx, width, height, t, opts = {}) {
+    if (!opts) return;
+    const grain = opts.grain !== undefined ? opts.grain : 0.042;
+    const vignette = opts.vignette !== undefined ? opts.vignette : 0.34;
+    const halation = opts.halation || 0;
+    const paper = Boolean(opts.paperTexture);
+    const barH = computeLetterboxBar(width, height, opts.letterbox);
+
+    ctx.save();
+    if (vignette > 0.005) {
+      const r0 = Math.min(width, height) * 0.34;
+      const r1 = Math.hypot(width, height) * 0.58;
+      const vg = ctx.createRadialGradient(width * 0.5, height * 0.5, r0, width * 0.5, height * 0.5, r1);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, `rgba(5,4,3,${clamp(vignette, 0, 0.85).toFixed(3)})`);
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    if (halation > 0.005) {
+      const hg = ctx.createRadialGradient(width * 0.5, height * 0.36, 10, width * 0.5, height * 0.42, width * 0.55);
+      hg.addColorStop(0, `rgba(235, 165, 92, ${clamp(halation, 0, 0.25).toFixed(3)})`);
+      hg.addColorStop(1, 'rgba(235, 165, 92, 0)');
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = hg;
+      ctx.fillRect(0, 0, width, height);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    if (paper) {
+      ctx.strokeStyle = 'rgba(40, 32, 22, 0.028)';
+      ctx.lineWidth = 1;
+      const step = 6;
+      for (let y = 0; y < height; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y + ((y * 13) % 3));
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+    }
+
+    if (grain > 0.004) {
+      const tile = getFilmGrainTile();
+      if (tile) {
+        const frameStep = Math.floor(Math.max(0, t) * 24);
+        const ox = (frameStep * 73) % 192;
+        const oy = (frameStep * 137) % 192;
+        ctx.globalCompositeOperation = 'overlay';
+        ctx.globalAlpha = clamp(grain, 0, 0.16);
+        const pat = ctx.createPattern(tile, 'repeat');
+        if (pat) {
+          ctx.translate(-ox, -oy);
+          ctx.fillStyle = pat;
+          ctx.fillRect(ox, oy, width + 192, height + 192);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    }
+
+    if (barH > 2) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, barH);
+      ctx.fillRect(0, height - barH, width, barH);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Renders real HD photography, museum art, or extracted video sequences with
+   * 2.5D Ken Burns camera motion, archival museum matting, chiaroscuro scrims, or knockout typography!
+   */
+  function drawImagePlate(ctx, keyOrImg, rect, opts = {}) {
+    const img = typeof keyOrImg === 'string' ? getAsset(keyOrImg) : keyOrImg;
+    const theme = getTheme(opts.theme);
+    const style = opts.style || 'full-bleed'; // 'full-bleed' | 'archival-plate' | 'editorial-frame' | 'knockout-type'
+    const progress = clamp(opts.progress ?? 0.5, 0, 1);
+    const localT = opts.localT ?? 1;
+    const anim = opts.entrance === false
+      ? { opacity: 1, y: 0, scale: 1 }
+      : entrance(localT, opts.entrance || { delay: opts.delay || 0, dur: 0.65, bounce: 0.04, risePx: style === 'full-bleed' ? 0 : 22 });
+    if (anim.opacity < 0.02) return;
+
+    const zoom = expZoom(opts.zoomFrom ?? 1.02, opts.zoomTo ?? 1.11, progress);
+    const panX = lerp(opts.panFromX ?? -0.02, opts.panToX ?? 0.02, progress);
+    const panY = lerp(opts.panFromY ?? -0.015, opts.panToY ?? 0.015, progress);
+
+    const drawCoverInside = (box) => {
+      if (!img || !img.width || !img.height) {
+        const g = ctx.createLinearGradient(box.x, box.y, box.x + box.w, box.y + box.h);
+        g.addColorStop(0, theme.surface);
+        g.addColorStop(1, theme.bgAlt || theme.bg);
+        ctx.fillStyle = g;
+        ctx.fillRect(box.x, box.y, box.w, box.h);
+        return;
+      }
+      const scale = Math.max(box.w / img.width, box.h / img.height) * zoom;
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      const dx = box.x + (box.w - dw) * 0.5 + panX * box.w;
+      const dy = box.y + (box.h - dh) * 0.5 + panY * box.h;
+      if (opts.filter) ctx.filter = opts.filter;
+      ctx.drawImage(img, dx, dy, dw, dh);
+      if (opts.filter) ctx.filter = 'none';
+    };
+
+    ctx.save();
+    ctx.globalAlpha *= anim.opacity;
+
+    if (style === 'knockout-type' && opts.text) {
+      const off = document.createElement('canvas');
+      off.width = Math.max(16, Math.round(rect.w));
+      off.height = Math.max(16, Math.round(rect.h));
+      const octx = off.getContext('2d');
+      octx.fillStyle = '#FFFFFF';
+      octx.font = `${opts.weight || 800} ${opts.fontPx || Math.round(rect.h * 0.68)}px ${opts.fontFamily || theme.fontDisplay}`;
+      octx.textAlign = 'center';
+      octx.textBaseline = 'middle';
+      octx.fillText(String(opts.text), off.width * 0.5, off.height * 0.5, off.width * 0.96);
+      octx.globalCompositeOperation = 'source-in';
+      if (img && img.width) {
+        const sc = Math.max(off.width / img.width, off.height / img.height) * zoom;
+        octx.drawImage(img, (off.width - img.width * sc) * 0.5, (off.height - img.height * sc) * 0.5, img.width * sc, img.height * sc);
+      }
+      ctx.drawImage(off, rect.x, rect.y + anim.y);
+      ctx.restore();
+      TELEMETRY.registerNode({
+        id: opts.id || 'knockout_title',
+        role: 'hero',
+        text: String(opts.text),
+        x: rect.x,
+        y: rect.y + anim.y,
+        w: rect.w,
+        h: rect.h,
+        fg: theme.fg,
+        bg: theme.bg,
+        skipContrast: true,
+      });
+      return;
+    }
+
+    if (style === 'archival-plate') {
+      const tiltRad = ((opts.tiltDeg || 0) * Math.PI) / 180;
+      const cx = rect.x + rect.w * 0.5;
+      const cy = rect.y + rect.h * 0.5 + anim.y;
+      ctx.translate(cx, cy);
+      ctx.rotate(tiltRad);
+      ctx.scale(anim.scale, anim.scale);
+      ctx.translate(-cx, -cy);
+
+      const matPad = opts.matPadding ?? 16;
+      const captionSpace = opts.caption ? 38 : 0;
+      // Soft museum paper drop shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.30)';
+      roundRectPath(ctx, rect.x + 6, rect.y + 14, rect.w, rect.h, 4);
+      ctx.fill();
+      // Warm cotton archival paper mat
+      ctx.fillStyle = opts.matColor || '#F6F1E7';
+      roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 4);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(20, 18, 15, 0.14)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      const inner = {
+        x: rect.x + matPad,
+        y: rect.y + matPad,
+        w: Math.max(16, rect.w - matPad * 2),
+        h: Math.max(16, rect.h - matPad * 2 - captionSpace),
+      };
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(inner.x, inner.y, inner.w, inner.h);
+      ctx.clip();
+      drawCoverInside(inner);
+      if (opts.tint) {
+        ctx.fillStyle = opts.tint;
+        ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
+      }
+      ctx.restore();
+
+      if (opts.caption) {
+        ctx.__mvsInternalText = true;
+        ctx.font = `500 13px ${theme.fontMono}`;
+        ctx.fillStyle = '#3F3A34';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(opts.caption), inner.x, inner.y + inner.h + captionSpace * 0.54, inner.w);
+        ctx.__mvsInternalText = false;
+      }
+      const worldRect = projectRect(ctx.getTransform(), rect.x, rect.y, rect.w, rect.h);
+      ctx.restore();
+      TELEMETRY.registerNode({ id: opts.id || 'archival_plate', role: 'diagram', text: '', ...worldRect, opacity: anim.opacity });
+      return;
+    }
+
+    // 'full-bleed' or 'editorial-frame'
+    const radius = style === 'editorial-frame' ? (opts.radius ?? 10) : 0;
+    ctx.save();
+    if (radius > 0) {
+      roundRectPath(ctx, rect.x, rect.y + anim.y, rect.w, rect.h, radius);
+      ctx.clip();
+    } else {
+      ctx.beginPath();
+      ctx.rect(rect.x, rect.y, rect.w, rect.h);
+      ctx.clip();
+    }
+    drawCoverInside({ x: rect.x, y: rect.y + anim.y, w: rect.w, h: rect.h });
+
+    // Directional Chiaroscuro Scrim so frameless editorial typography reads cleanly without boxes!
+    if (opts.scrim) {
+      const strength = opts.scrimStrength ?? 0.78;
+      let sg;
+      if (opts.scrim === 'left') {
+        sg = ctx.createLinearGradient(rect.x, 0, rect.x + rect.w * 0.72, 0);
+        sg.addColorStop(0, hexAlpha(theme.bg, strength));
+        sg.addColorStop(0.55, hexAlpha(theme.bg, strength * 0.58));
+        sg.addColorStop(1, hexAlpha(theme.bg, 0.08));
+      } else if (opts.scrim === 'right') {
+        sg = ctx.createLinearGradient(rect.x + rect.w, 0, rect.x + rect.w * 0.28, 0);
+        sg.addColorStop(0, hexAlpha(theme.bg, strength));
+        sg.addColorStop(0.55, hexAlpha(theme.bg, strength * 0.58));
+        sg.addColorStop(1, hexAlpha(theme.bg, 0.08));
+      } else {
+        // 'bottom' / 'cinema'
+        sg = ctx.createLinearGradient(0, rect.y + rect.h, 0, rect.y + rect.h * 0.18);
+        sg.addColorStop(0, hexAlpha(theme.bg, strength));
+        sg.addColorStop(0.5, hexAlpha(theme.bg, strength * 0.45));
+        sg.addColorStop(1, hexAlpha(theme.bg, opts.scrim === 'cinema' ? 0.22 : 0.06));
+      }
+      ctx.fillStyle = sg;
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    }
+    ctx.restore();
+    ctx.restore();
+
+    if (style === 'editorial-frame') {
+      TELEMETRY.registerNode({ id: opts.id || 'editorial_frame', role: 'diagram', text: '', x: rect.x, y: rect.y + anim.y, w: rect.w, h: rect.h, opacity: anim.opacity });
+    }
+  }
+
+  /**
+   * Vox / Documentary organic ink highlighter stroke swept progressively behind or under key text.
+   */
+  function drawHighlighter(ctx, rect, progress = 1, color = '#EAB308', opts = {}) {
+    const p = EASE.studioInOut(clamp(progress, 0, 1));
+    if (p <= 0.01) return;
+    const w = rect.w * p;
+    ctx.save();
+    ctx.globalAlpha *= opts.alpha ?? 0.34;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(rect.x - 4, rect.y + 3);
+    ctx.lineTo(rect.x + w + 4, rect.y + 1);
+    ctx.lineTo(rect.x + w, rect.y + rect.h - 1);
+    ctx.lineTo(rect.x - 6, rect.y + rect.h + 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   function renderTimeline(ctx, timeline, sceneRenderers, t, opts = {}) {
     const W = timeline.width || ctx.canvas.width;
     const H = timeline.height || ctx.canvas.height;
-    const safe = computeSafeZone(W, H, timeline.meta?.aspect || 'auto');
-    const theme = getTheme(opts.theme || timeline.meta?.style);
+    const opticsCfg = opts.optics !== undefined ? opts.optics : (timeline.optics || timeline.creativeDirection?.optics || null);
+    const barH = computeLetterboxBar(W, H, opticsCfg?.letterbox);
+    const rawSafe = computeSafeZone(W, H, timeline.meta?.aspect || 'auto');
+    const safe = barH > 0 ? {
+      ...rawSafe,
+      y: Math.max(rawSafe.y, barH + 28),
+      h: Math.max(120, Math.min(rawSafe.y + rawSafe.h, H - barH - 28) - Math.max(rawSafe.y, barH + 28)),
+    } : rawSafe;
+    const baseTheme = getTheme(opts.theme || timeline.meta?.style);
     const scenes = timeline.scenes || [];
     const baseTransDur = opts.transitionDur !== undefined ? opts.transitionDur : 0.38;
 
@@ -2130,6 +2543,7 @@
     if (activeIdx === -1) activeIdx = t < (scenes[0]?.start || 0) ? 0 : Math.max(0, scenes.length - 1);
     const cur = scenes[activeIdx];
     if (!cur) return;
+    const theme = resolveSceneTheme(baseTheme, cur);
 
     const localT = Math.max(0, t - cur.start);
     const mode = cur.transition || opts.transition || 'whip';
@@ -2139,6 +2553,7 @@
     const invokeScene = (sc, scLocalT, alpha = 1, offsetX = 0, scaleMul = 1, offsetY = 0) => {
       const fn = sceneRenderers[sc.id] || sceneRenderers.default;
       if (typeof fn !== 'function') return;
+      const scTheme = resolveSceneTheme(baseTheme, sc);
       ctx.save();
       ctx.globalAlpha *= clamp(alpha, 0, 1);
 
@@ -2162,7 +2577,7 @@
         safe,
         width: W,
         height: H,
-        theme,
+        theme: scTheme,
       });
       ctx.restore();
     };
@@ -2250,6 +2665,9 @@
     }
 
     drawCaptions(ctx, timeline, t, { theme, suppressCaptions: cur.suppressCaptions || opts.suppressCaptions });
+    if (opticsCfg) {
+      applyCinemaOptics(ctx, W, H, t, opticsCfg);
+    }
   }
 
   // ============================================================================
@@ -2264,6 +2682,13 @@
     await img.decode();
     assetCache[key] = img;
     return img;
+  }
+
+  async function preloadBundle(bundleMap) {
+    const map = bundleMap || (typeof window !== 'undefined' ? window.__MVS_ASSETS__ : null) || {};
+    const entries = Object.entries(map);
+    await Promise.all(entries.map(([k, dataUri]) => preloadImage(k, dataUri).catch(() => null)));
+    return Object.keys(assetCache);
   }
 
   async function preloadSvgText(key, svgText) {
@@ -2556,8 +2981,202 @@
     });
   }
 
+  /**
+   * Multi-Universe Cinema & Documentary Score Synthesizer (with J-Cut pre-transition swells).
+   * Moods: 'cinema-strings' | 'documentary-felt' | 'minimal-luxury' | 'tech-pulse'
+   */
+  async function synthCinemaScore(opts = {}) {
+    const mood = opts.mood || 'cinema-strings';
+    if (mood === 'tech-pulse') return synthStudioAudio(opts);
+    if (typeof OfflineAudioContext === 'undefined') return null;
+
+    const bpm = opts.bpm || (mood === 'cinema-strings' ? 76 : mood === 'documentary-felt' ? 88 : 72);
+    const duration = opts.duration || 15;
+    const sr = opts.sampleRate || 44100;
+    const beat = 60 / bpm;
+    const jCutSec = opts.jCutSec ?? 0.38;
+    const ctx = new OfflineAudioContext(2, Math.ceil(sr * duration), sr);
+    const rand = mulberry32(opts.seed || 0x35c14e7a);
+
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, 0);
+    master.gain.linearRampToValueAtTime(opts.gain ?? 0.58, Math.min(0.6, duration * 0.1));
+    master.gain.setValueAtTime(opts.gain ?? 0.58, Math.max(0.7, duration - 0.85));
+    master.gain.linearRampToValueAtTime(0.0001, duration);
+    master.connect(ctx.destination);
+
+    // Vocal formant pocket (-4.5 dB @ 1.3 kHz)
+    const carve = ctx.createBiquadFilter();
+    carve.type = 'peaking';
+    carve.frequency.value = 1300;
+    carve.Q.value = 0.85;
+    carve.gain.value = -4.5;
+    carve.connect(master);
+
+    // Subtle analog room/tape warmth bed (Paul Kellet pink noise filtered at 650 Hz)
+    const pLen = Math.ceil(Math.min(4, duration) * sr);
+    const pinkBuf = ctx.createBuffer(1, pLen, sr);
+    const pd = pinkBuf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < pLen; i++) {
+      const w = rand() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.96900 * b2 + w * 0.1538520;
+      b3 = 0.86650 * b3 + w * 0.3104856;
+      b4 = 0.55000 * b4 + w * 0.5329522;
+      b5 = -0.76160 * b5 - w * 0.0168980;
+      pd[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.10;
+      b6 = w * 0.115926;
+    }
+    const roomSrc = ctx.createBufferSource();
+    roomSrc.buffer = pinkBuf;
+    roomSrc.loop = true;
+    const roomLp = ctx.createBiquadFilter();
+    roomLp.type = 'lowpass';
+    roomLp.frequency.value = 520;
+    const roomG = ctx.createGain();
+    roomG.gain.value = mood === 'minimal-luxury' ? 0.012 : 0.024;
+    roomSrc.connect(roomLp).connect(roomG).connect(carve);
+    roomSrc.start(0);
+    roomSrc.stop(duration);
+
+    const PROGRESSIONS = {
+      'cinema-strings': [
+        { bass: 73.42, chord: [146.83, 220.0, 293.66, 349.23], motif: [440.0, 523.25] },   // Dm9
+        { bass: 58.27, chord: [116.54, 174.61, 261.63, 329.63], motif: [392.0, 440.0] },   // Bbmaj9
+        { bass: 87.31, chord: [174.61, 261.63, 329.63, 440.0], motif: [523.25, 587.33] },  // Fmaj7
+        { bass: 65.41, chord: [130.81, 196.0, 293.66, 392.0], motif: [493.88, 440.0] },    // Csus2/G
+      ],
+      'documentary-felt': [
+        { bass: 110.0, chord: [220.0, 261.63, 329.63, 392.0], motif: [523.25, 493.88, 392.0] },
+        { bass: 87.31, chord: [174.61, 261.63, 329.63, 392.0], motif: [440.0, 523.25, 392.0] },
+        { bass: 130.81, chord: [196.0, 261.63, 329.63, 392.0], motif: [587.33, 523.25, 440.0] },
+        { bass: 98.0, chord: [196.0, 246.94, 293.66, 392.0], motif: [493.88, 440.0, 392.0] },
+      ],
+      'minimal-luxury': [
+        { bass: 82.41, chord: [164.81, 246.94, 311.13, 392.0], motif: [622.25] },
+        { bass: 65.41, chord: [130.81, 196.0, 246.94, 369.99], motif: [587.33] },
+      ],
+    };
+    const prog = PROGRESSIONS[mood] || PROGRESSIONS['cinema-strings'];
+    const barDur = beat * 4;
+    const bars = Math.ceil(duration / barDur);
+
+    for (let bar = 0; bar < bars; bar++) {
+      const t0 = bar * barDur;
+      if (t0 >= duration) break;
+      const dur = Math.min(barDur, duration - t0);
+      const p = prog[bar % prog.length];
+
+      // Bowed warm cello / ensemble pad
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(mood === 'cinema-strings' ? 420 : 620, t0);
+      lp.frequency.exponentialRampToValueAtTime(mood === 'cinema-strings' ? 1150 : 880, t0 + dur * 0.55);
+      lp.frequency.exponentialRampToValueAtTime(460, t0 + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(0.18 / Math.sqrt(p.chord.length), t0 + Math.min(0.65, dur * 0.28));
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.12);
+      lp.connect(g).connect(carve);
+
+      p.chord.forEach((freq, idx) => {
+        for (const det of [-7, 0, 7]) {
+          const osc = ctx.createOscillator();
+          const pan = ctx.createStereoPanner();
+          osc.type = mood === 'cinema-strings' ? (det === 0 ? 'triangle' : 'sawtooth') : 'sine';
+          osc.frequency.value = freq;
+          osc.detune.value = det + idx * 1.5;
+          pan.pan.value = det * 0.045;
+          osc.connect(pan).connect(lp);
+          osc.start(t0);
+          osc.stop(t0 + dur + 0.15);
+        }
+      });
+
+      // Deep cinema contrabass / sub foundation
+      const sub = ctx.createOscillator();
+      const subG = ctx.createGain();
+      sub.type = 'sine';
+      sub.frequency.value = p.bass;
+      subG.gain.setValueAtTime(0.0001, t0);
+      subG.gain.linearRampToValueAtTime(0.30, t0 + 0.18);
+      subG.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.95);
+      sub.connect(subG).connect(carve);
+      sub.start(t0);
+      sub.stop(t0 + dur);
+
+      // Intimate felt-piano / glass harmonic motif notes
+      p.motif.forEach((mFreq, mIdx) => {
+        const nt = t0 + (mIdx + 0.5) * (dur / (p.motif.length + 0.6));
+        if (nt >= duration - 0.15) return;
+        const mo = ctx.createOscillator();
+        const mo2 = ctx.createOscillator();
+        const flt = ctx.createBiquadFilter();
+        const mg = ctx.createGain();
+        mo.type = 'triangle';
+        mo.frequency.value = mFreq;
+        mo2.type = 'sine';
+        mo2.frequency.value = mFreq * 2;
+        flt.type = 'lowpass';
+        flt.frequency.setValueAtTime(1800, nt);
+        flt.frequency.exponentialRampToValueAtTime(520, nt + 1.1);
+        mg.gain.setValueAtTime(0.0001, nt);
+        mg.gain.linearRampToValueAtTime(0.11, nt + 0.022); // soft felt hammer attack
+        mg.gain.exponentialRampToValueAtTime(0.0001, Math.min(duration, nt + 1.45));
+        const g2 = ctx.createGain();
+        g2.gain.value = 0.18;
+        mo.connect(flt);
+        mo2.connect(g2).connect(flt);
+        flt.connect(mg).connect(carve);
+        mo.start(nt); mo2.start(nt);
+        mo.stop(Math.min(duration, nt + 1.5)); mo2.stop(Math.min(duration, nt + 1.5));
+      });
+    }
+
+    // J-Cut Pre-Transition Swells (sound leads the visual cut by `jCutSec` ~0.38s!)
+    if (Array.isArray(opts.cues)) {
+      for (const cueTime of opts.cues) {
+        if (cueTime <= 0.2 || cueTime >= duration - 0.2) continue;
+        const startSw = Math.max(0, cueTime - jCutSec);
+        // Warm reverse harmonic + breath swell peaking right onto the cut, then deep cinema thud
+        const sw = ctx.createBufferSource();
+        sw.buffer = pinkBuf;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.Q.value = 1.4;
+        bp.frequency.setValueAtTime(180, startSw);
+        bp.frequency.exponentialRampToValueAtTime(980, cueTime);
+        bp.frequency.exponentialRampToValueAtTime(210, Math.min(duration, cueTime + 0.35));
+        const sg = ctx.createGain();
+        sg.gain.setValueAtTime(0.0001, startSw);
+        sg.gain.exponentialRampToValueAtTime(0.19, cueTime);
+        sg.gain.exponentialRampToValueAtTime(0.0001, Math.min(duration, cueTime + 0.38));
+        sw.connect(bp).connect(sg).connect(master);
+        sw.start(startSw, 0, jCutSec + 0.42);
+
+        // Soft timpani / cinema impact on cut frame
+        const imp = ctx.createOscillator();
+        const ig = ctx.createGain();
+        imp.type = 'sine';
+        imp.frequency.setValueAtTime(78, cueTime);
+        imp.frequency.exponentialRampToValueAtTime(34, Math.min(duration, cueTime + 0.34));
+        ig.gain.setValueAtTime(0.0001, cueTime);
+        ig.gain.linearRampToValueAtTime(0.32, cueTime + 0.012);
+        ig.gain.exponentialRampToValueAtTime(0.0001, Math.min(duration, cueTime + 0.42));
+        imp.connect(ig).connect(master);
+        imp.start(cueTime);
+        imp.stop(Math.min(duration, cueTime + 0.45));
+      }
+    }
+
+    const rendered = await ctx.startRendering();
+    return { mime: 'wav', base64: audioBufferToWavBase64(rendered) };
+  }
+
   const MVS = {
-    version: '2.1.0',
+    version: '3.0.0',
     clamp,
     lerp,
     remap,
@@ -2579,8 +3198,12 @@
     mixOklch,
     studioShadePair,
     THEMES,
+    FONT_PAIRINGS,
+    loadGoogleFonts,
     getTheme,
+    resolveSceneTheme,
     computeSafeZone,
+    computeLetterboxBar,
     vstack,
     hstack,
     bentoGrid,
@@ -2599,14 +3222,19 @@
     drawActor,
     drawCallout,
     drawHudOverlay,
+    drawImagePlate,
+    drawHighlighter,
+    applyCinemaOptics,
     drawCaptions,
     createShaderBackdrop,
     renderTimeline,
     preloadImage,
+    preloadBundle,
     preloadSvgText,
     preloadIconify,
     getAsset,
     synthStudioAudio,
+    synthCinemaScore,
     TELEMETRY,
   };
 
