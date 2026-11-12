@@ -1,113 +1,57 @@
-# Audio — TTS, music, SFX, beat grids, mixing
+# Audio v2.0 — Multi-Engine TTS, Warm Studio WebAudio Bed, Foley & Spectral Carving
 
-Audio is half the perceived quality. Silence or bad sync is the #1 tell of AI video.
-Target: voice/music/SFX as separate stems, mixed with ducking, normalized to −14 LUFS
-integrated (−1.5 dBTP). Social platforms normalize to roughly −14 anyway.
+Audio accounts for 50% of perceived studio quality. Harsh white-noise hats, robotic untimed captions, or music masking the voiceover immediately expose an amateur AI video.
 
-## 1. The grid: declare BPM, don't detect
+---
 
-- You control the music → generate it ON the grid (synth recipes below): every event at
-  `beat_k = k · 60/bpm`. Visuals read the same grid from timeline.json. Deterministic by
-  construction.
-- Syncing an EXISTING track → estimate BPM + beats once, then treat the result as the grid:
+## 1. Voiceover First (`tts-voiceover` v2.0)
+
+Generate narration **before** animating scenes so real speech cadences lock `timeline.json`:
 
 ```bash
-pip install librosa
-python scripts/beat_grid.py music.mp3 beats.json   # { bpm, beats[], downbeats[], duration }
+# Multi-scene VO-first generation (frame-quantized durations + smart FR/EN/CJK captions + RMS/bass/high envelope!)
+python <tts-voiceover>/scripts/vo_gen.py --scenes-json video/scenes.json --voice fr-FR-DeniseNeural --fps 30 --prefix video/vo
 ```
 
-Sanity-check the detected BPM against the track's published tempo before trusting it.
+### 2026 TTS Engine Menu
 
-## 2. Voiceover (TTS menu)
+| Engine | Access | Key Strength & Word-Timing Strategy |
+|---|---|---|
+| **`edge-tts` v7.3+** *(Default)* | Free, zero key | Built into `vo_gen.py` (`boundary="WordBoundary"` + source punctuation restoration + French elision `l'IA` & CJK Kinsoku smart segmenter). |
+| **`Kokoro-82M` v1.1** | Apache-2.0 local CPU | Ultra-fast natural voices (`af_heart`, `ff_siwis`); `result.pred_dur` (`25ms`/unit) gives exact phoneme durations in EN/FR without Whisper! |
+| **Gemini TTS (`3.1-flash-tts`)** | API | Supports `[whispers]`, `[excited]`, `[short pause]` tags — always strip tags (`strip_tts_tags`) before captioning & forced-align via `stable-ts`. |
+| **CosyVoice 3 / Fish-Speech / Qwen3-TTS** | Open-weight local | SOTA Chinese/multilingual prosody & zero-shot timbre cloning; align word windows via `stable-ts` or `FireRedASR2-CTC`. |
+| **ElevenLabs (`/with-timestamps`)** | Paid API | Character-level `alignment` JSON (validate monotonic timestamps on long paragraphs; fallback to `stable-ts` if degenerate). |
 
-| Engine | Cost | Command / access | Word timing |
-|---|---|---|---|
-| edge-tts | free, no key | `edge-tts --voice fr-FR-HenriNeural --text "..." --write-media vo.mp3 --write-subtitles vo.vtt` | word-boundary events (also grab JSON: `edge-tts --list-voices` to pick; python API `Communicate.stream()` gives `WordBoundary` offsets) |
-| Kokoro | free, local | `pip install kokoro` (82M params, 8 voices, good quality) | whisper it |
-| Piper | free, local | `piper --model fr_FR-siwis-medium --output_file vo.wav` | whisper it |
-| ElevenLabs | paid | API `with-timestamps` returns character-level times | built-in, feed `@remotion/captions` `elevenLabsTranscriptToCaptions` |
-| VOICEVOX (JP) | free, local | HTTP `http://localhost:50021` | per-phoneme timings (great for JP lip flap) |
+- **Forced Alignment Rule**: When aligning external audio, use **`stable-ts` (`model.align(audio, clean_script)`)** instead of blind `whisper.transcribe()` so domain terms, numbers, and brand names are 100% preserved.
 
-Voice directions that work: short sentences, explicit pace ("calm documentary pace",
-"energetic 1.15×"), punctuation for pauses. Re-generate per sentence and assemble — easier
-to redo one bad line.
+---
 
-Word timing of any audio (the universal fallback):
-```bash
-pip install faster-whisper
-python -c "from faster_whisper import WhisperModel; import json; m=WhisperModel('small'); segs,info=m.transcribe('vo.mp3',word_timestamps=True); print(json.dumps([w._asdict() for s in segs for w in s.words]))" > words.json
-```
-Then write `tokens[]` into timeline.captions — caption pops snap to actual words, not guesses.
+## 2. Warm Studio Music & Foley in Pure Code (`MVS.synthStudioAudio`)
 
-## 3. Music in code (Web Audio / OfflineAudioContext)
+Never use raw `Math.random()` white noise or piercing unfiltered sawtooth oscillators. `assets/motion-kit.js` includes `MVS.synthStudioAudio({ bpm, duration, cues, seed })` out of the box:
+1. **Paul Kellet 6-Pole Pink Noise (`-3 dB/oct`)** seeded with `mulberry32` for silky shakers and organic **bandpass Doppler whooshes** at scene `cues[]`.
+2. **Neo-Soul / Editorial Voicings (`Fmaj9 → Em7 → Dm9 → Cmaj9`)**: stereo-detuned (`±6 cents`) oscillators routed through a breathing lowpass (`540–960 Hz`).
+3. **Built-In `-4.5 dB @ 1250 Hz` Vocal-Formant Carve**: leaves a clean pocket in the human speech intelligibility band (`800 Hz – 2.5 kHz`) automatically!
+4. **Soft Felt Kick (`112 → 45 Hz`, `6ms` attack)** + warm sine sub-bass.
 
-Synthesize the track while rendering (`window.renderAudio()` in the canvas engine, or a
-Node/python pre-pass writing `music.wav`). Everything locks to the BPM grid:
+---
 
-```js
-function synthTrack(bpm, bars) {                    // 120bpm, 8 bars ≈ 16s
-  const sr = 44100, beat = 60 / bpm, len = bars * 4 * beat;
-  const ctx = new OfflineAudioContext(2, sr * len, sr);
-  const kick = (t) => {                             // pitch-drop sine + exp decay
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
-    g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.3);
-  };
-  const hat = (t) => {                              // highpassed noise burst
-    const b = ctx.createBuffer(1, sr * 0.05, sr), d = b.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-    s.buffer = b; f.type = 'highpass'; f.frequency.value = 8000; g.gain.value = 0.25;
-    s.connect(f).connect(g).connect(ctx.destination); s.start(t);
-  };
-  for (let bar = 0; bar < bars; bar++) for (let b = 0; b < 4; b++) {
-    const t = (bar * 4 + b) * beat;
-    if (b === 0) kick(t);                           // four-on-the-floor
-    hat(t + beat / 2);                              // offbeat hats
-  }
-  return ctx.startRendering();                      // → AudioBuffer → WAV encode
-}
-```
+## 3. Mixing Voiceover + Music Without Pumping (Spectral Carve + 2-Pass R128)
 
-Structure rules that make synth tracks feel produced: intro (kick+bass only) → build
-(add hats, filter opens over 2 bars) → 0.1s of FULL silence → drop (everything + pad:
-7 detuned saws ±8 cents through a lowpass). Sidechain feel: duck pad/gain by 30% for 80ms
-on every kick (schedule gain envelopes at kick times).
-
-Alternatives: Suno API (v5, one-shot "Sounds" mode for SFX), ACE-Step (Apache-2.0 local),
-or any provided track — then beat_grid.py (§1).
-
-SFX: synthesize whooshes (filtered noise sweep 200→8000Hz over 0.3s), impacts (low sine
-burst + noise click), ticks — or freesound.org (434k CC sounds, `freesound-python`).
-The $0.15-explainer playbook: a cue sheet (248 cues: time + type) → 48 NumPy-synthesized
-SFX — code is free, files are licensed.
-
-## 4. Mixing (ffmpeg)
+Broadband `sidechaincompress` with high ratios crushes sub-bass and highs every time the narrator speaks. Instead, duck gently in the vocal midrange (`300 Hz – 3 kHz`) and normalize linearly in 2 passes:
 
 ```bash
-# Duck music under VO (sidechain: VO as trigger) — stems must be separate files
-ffmpeg -i vo.mp3 -i music.mp3 -filter_complex \
- "[1:a]volume=0.6[m];[m][0:a]sidechaincompress=threshold=0.03:ratio=8:attack=5:release=300[duck];[0:a][duck]amix=inputs=2:duration=first:dropout_transition=2[out]" \
- -map "[out]" mixed.mp3
+# 1. Mix VO + music bed with gentle midrange carve & sidechain ducking
+ffmpeg -y -i video/vo.mp3 -i out/music.wav -filter_complex \
+  "[1:a]volume=0.38,equalizer=f=1350:t=q:w=1.1:g=-5[bed]; \
+   [bed][0:a]sidechaincompress=threshold=0.035:ratio=4:attack=8:release=280[duck]; \
+   [0:a]highpass=f=80[vo]; \
+   [vo][duck]amix=inputs=2:duration=first:normalize=0[out]" \
+  -map "[out]" out/mixed.wav
 
-# Loudness normalize a stem or the final mix
-ffmpeg -i mixed.mp3 -af "loudnorm=I=-14:TP=-1.5:LRA=11" -ar 44100 final_audio.wav
+# 2. Mux during render_frames.mjs (--audio out/mixed.wav), then master to exact -14 LUFS + BT.709
+node <video-qa>/scripts/post.mjs out/raw.mp4 out/video.mp4 --matrix 709 --loud -14
 ```
 
-Mix levels: VO −14 LUFS anchor, music bed −18 to −22 LUFS before ducking, SFX peaks ≤ −12.
-VO stem chain if needed: highpass 80Hz → gentle compressor → de-ess → loudnorm.
-
-## 5. Sync verification (do this, it's cheap)
-
-- In the page/build code: assert every visual cue time and its audio event time differ by
-  < 30ms — both read timeline.json, so a violation is a bug, not a mix issue.
-- A/B in the render: extract 3 frames at cue times ± 1 frame and confirm the visual state
-  flips exactly at the cue (see verify.md determinism checks).
-- Watch the contact sheet against the beat grid: cuts on downbeats should line up column-wise.
-
-## 6. Legal hygiene
-
-- Code-synthesized audio = yours. Suno/ACE-Step/ElevenLabs: check the plan's commercial
-  terms before monetizing. freesound: respect the CC attribution variants (log credits).
-- Never present AI voices as real people; keep a LICENSES note when shipping assets.
+Target levels: **Integrated `-14.0 ± 1.0 LUFS`**, **True Peak `≤ -1.5 dBTP`**, music bed `-18` to `-22 LUFS` under speech, SFX peaks `≤ -12 dBFS`.

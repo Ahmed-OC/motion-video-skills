@@ -25,7 +25,20 @@
 import { parseArgs } from 'node:util';
 import { spawnSync } from 'node:child_process';
 
+// Normalize negative numeric flag values (`--loud -14` -> `--loud=-14`) so Node parseArgs never throws
+const normArgv = [];
+const rawArgv = process.argv.slice(2);
+for (let i = 0; i < rawArgv.length; i++) {
+  if ((rawArgv[i] === '--loud' || rawArgv[i] === '--tp' || rawArgv[i] === '--gain') && rawArgv[i + 1] && /^-\d/.test(rawArgv[i + 1])) {
+    normArgv.push(`${rawArgv[i]}=${rawArgv[i + 1]}`);
+    i++;
+  } else {
+    normArgv.push(rawArgv[i]);
+  }
+}
+
 const { values: args, positionals } = parseArgs({
+  args: normArgv,
   allowPositionals: true,
   options: {
     gain: { type: 'string' },

@@ -1,30 +1,20 @@
 #!/usr/bin/env node
 /**
- * stills.mjs — headless QA harness for seek()-contract pages. One browser, many instants:
- * iterate on poses, layout and timing at a fraction of a full render's cost.
+ * stills.mjs (v2.0) — headless QA harness for seek()-contract pages.
  *
- *   --times   render chosen instants to PNG (style gates, pose checks, before/after proofs)
- *   --scan    seek EVERY frame once, no screenshots: surfaces any JS error at any t
- *   --determinism  render each instant twice on FRESH pages and byte-compare
- *                  (accumulated state survives same-page re-seeks — a fresh page doesn't)
- *
- * Usage (from the video project's parent directory, like render_frames.mjs):
- *   node <skill>/scripts/stills.mjs --file video/index.html --times 1.0,4.5,8.3 --out out/qa
- *   node <skill>/scripts/stills.mjs --file video/index.html --scan
- *   node <skill>/scripts/stills.mjs --file video/index.html --times 1.0,8.3 --determinism
- *   Options: --selector "#stage" (element to capture; default: first canvas)
- *
- * Exit 1 on any page error or determinism mismatch. Note: a NaN drawn to canvas renders
- * NOTHING and logs NOTHING — pair --scan with an init-time finiteness audit in the page
- * (see references/verify.md) and with video-qa's disco.mjs on the final render.
- * Requires playwright resolvable from the CURRENT project.
+ *   --times   render chosen instants to PNG (dual-seek warmed on fresh pages)
+ *   --scan    seek EVERY frame once: surfaces JS errors + NaN canvas calls via MVS telemetry
+ *   --determinism  render each instant twice on FRESH pages and SHA-256 byte-compare
  */
 import { parseArgs } from 'node:util';
 import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const { values: args } = parseArgs({
   options: {
@@ -33,7 +23,7 @@ const { values: args } = parseArgs({
     out: { type: 'string', default: 'out/qa-stills' },
     scan: { type: 'boolean', default: false },
     determinism: { type: 'boolean', default: false },
-    selector: { type: 'string', default: 'canvas' },
+    selector: { type: 'string', default: '' },
   },
 });
 if (!args.file || (!args.times && !args.scan)) {
@@ -41,36 +31,85 @@ if (!args.file || (!args.times && !args.scan)) {
   process.exit(1);
 }
 
-const require = createRequire(path.join(process.cwd(), 'package.json'));
-let chromium;
-try { ({ chromium } = require('playwright')); } catch {
-  try { ({ chromium } = require('playwright-core')); } catch {
-    console.error('✗ playwright is not resolvable from the current project.\n' +
-      '  npm i -D playwright && npx playwright install chromium   (then re-run from that directory)');
-    process.exit(1);
+function resolvePlaywright() {
+  const globalNodeModules = path.resolve(process.execPath, '..', '..', 'lib', 'node_modules');
+  const bases = [
+    path.join(process.cwd(), 'package.json'),
+    path.join(__dirname, '..', '..', '..', 'package.json'),
+    path.join(globalNodeModules, 'playwright', 'package.json'),
+    path.join(globalNodeModules, 'playwright-core', 'package.json'),
+    path.join(os.homedir(), 'template_cache', 'package.json'),
+    '/usr/lib/node_modules/playwright/package.json',
+  ];
+  for (const b of bases) {
+    if (!existsSync(b)) continue;
+    try { return createRequire(b)('playwright'); } catch {}
+    try { return createRequire(b)('playwright-core'); } catch {}
+  }
+  console.error('✗ playwright not found. Install: npm i -g playwright-core && npx playwright install chromium');
+  process.exit(1);
+}
+
+async function launchChromium(chromium) {
+  const launchArgs = ['--allow-file-access-from-files'];
+  try {
+    return await chromium.launch({ args: launchArgs });
+  } catch (err) {
+    const msCache = path.join(os.homedir(), '.cache', 'ms-playwright');
+    if (existsSync(msCache)) {
+      const { readdirSync } = await import('node:fs');
+      const dirs = readdirSync(msCache).filter((d) => d.startsWith('chromium-')).sort().reverse();
+      for (const d of dirs) {
+        for (const sub of [['chrome-linux64', 'chrome'], ['chrome-linux', 'chrome']]) {
+          const exe = path.join(msCache, d, ...sub);
+          if (existsSync(exe)) return chromium.launch({ executablePath: exe, args: launchArgs });
+        }
+      }
+    }
+    throw err;
   }
 }
 
+const { chromium } = resolvePlaywright();
+const kitPath = path.resolve(__dirname, '..', 'assets', 'motion-kit.js');
+const kitCode = existsSync(kitPath) ? readFileSync(kitPath, 'utf8') : '';
+
 const url = pathToFileURL(path.resolve(args.file)).href;
 const errors = new Set();
-const browser = await chromium.launch();
+const browser = await launchChromium(chromium);
+
 async function freshPage() {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   page.on('pageerror', (e) => errors.add(`pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.add(`console: ${m.text()}`); });
-  await page.goto(url);
-  await page.evaluate(async () => { if (window.onReady) await window.onReady(); });
-  // the viewport MUST cover the whole frame: seek pages usually set overflow:hidden, so an
-  // element screenshot cannot scroll — anything outside the viewport comes out black
+  if (kitCode) await page.addInitScript({ content: kitCode });
+  await page.goto(url, { waitUntil: 'load', timeout: 30000 });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    if (window.onReady) await window.onReady();
+  });
   const V = await page.evaluate(() => window.VIDEO);
-  if (V && V.width && V.height) await page.setViewportSize({ width: V.width, height: V.height });
+  if (V && V.width && V.height) await page.setViewportSize({ width: Math.round(V.width), height: Math.round(V.height) });
+  // Dual-seek warm-up on fresh page
+  await page.evaluate(async () => {
+    const r = window.seek(0);
+    if (r && typeof r.then === 'function') await r;
+    await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+  });
   return page;
 }
+
 async function shoot(page, t) {
-  await page.evaluate((tt) => window.seek(tt), t);
-  const el = await page.$(args.selector);
-  if (!el) throw new Error(`no element matches ${args.selector}`);
-  return el.screenshot({ type: 'png' });
+  await page.evaluate(async (tt) => {
+    const r = window.seek(tt);
+    if (r && typeof r.then === 'function') await r;
+  }, t);
+  if (args.selector) {
+    const el = await page.$(args.selector);
+    if (!el) throw new Error(`no element matches ${args.selector}`);
+    return el.screenshot({ type: 'png' });
+  }
+  return page.screenshot({ type: 'png' });
 }
 
 let failed = false;
@@ -85,8 +124,17 @@ if (args.scan) {
   } else {
     const n = Math.round(V.duration * V.fps);
     for (let i = 0; i < n; i++) {
-      try { await page.evaluate((tt) => window.seek(tt), i / V.fps); }
-      catch (e) { errors.add(`seek(${(i / V.fps).toFixed(3)}): ${e.message.split('\n')[0]}`); }
+      try {
+        const nanErrs = await page.evaluate(async (tt) => {
+          if (window.__MVS_TELEMETRY__) window.__MVS_TELEMETRY__.beginFrame(tt, 'scan');
+          const r = window.seek(tt);
+          if (r && typeof r.then === 'function') await r;
+          return window.__MVS_TELEMETRY__ ? window.__MVS_TELEMETRY__.snapshot().nanErrors : [];
+        }, i / V.fps);
+        if (nanErrs.length) errors.add(`NaN canvas call @ t=${(i / V.fps).toFixed(3)}s: ${nanErrs[0].op}`);
+      } catch (e) {
+        errors.add(`seek(${(i / V.fps).toFixed(3)}): ${e.message.split('\n')[0]}`);
+      }
     }
     console.log(`scan: ${n} frames seeked`);
   }

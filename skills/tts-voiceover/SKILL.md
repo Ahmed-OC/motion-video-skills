@@ -1,81 +1,55 @@
 ---
 name: tts-voiceover
 description: >-
-  Generate voiceovers with WORD-LEVEL timings: free multilingual TTS via edge-tts (default),
-  local Kokoro/Piper, or ElevenLabs — and turn any audio into word timestamps with
-  faster-whisper. Produces vo.mp3, a words/captions JSON (caption pages of 1–3 words with
-  per-word time windows), and an embeddable vo.js for canvas/web video pipelines. Use
-  whenever the user needs narration, voiceover, TTS, a dubbed track, text-to-speech in any
-  language, or word-synced captions/subtitles (TikTok/Hormozi style) for a video or animation.
+  Generate studio voiceovers with frame-quantized scene timings, smart multilingual captions
+  (FR elisions + narrow non-breaking spaces, EN orphan-free pages, CJK Kinsoku chunking), and
+  per-frame audio envelopes (`rms`, `bass`, `high`). Supports free `edge-tts` (default),
+  multi-scene JSON scripts (`--scenes-json`), local `kokoro`, `faster-whisper` / `stable-ts`
+  alignment, and drop-in `vo.js` / `vo_words.json` outputs.
 ---
 
-# TTS Voiceover — narration with word-level timings
+# TTS Voiceover v2.0 — VO-First Timing, Smart Multilingual Captions & Envelopes
 
-Word timings are what make captions pop on the right word and scenes pace on the right
-syllable. Always generate the VO FIRST and animate to its real timings — never the
-reverse.
+Narration paces everything: **always generate voiceover FIRST**, lock frame-exact scene durations from the real speech, and animate visuals to those cue times.
 
-## Quickstart (free, no API key)
+---
+
+## 1. Quickstart (Single Script or Multi-Scene VO-First JSON)
 
 ```bash
-pip install edge-tts
-python scripts/vo_gen.py --text "Pythagore. Dans un triangle rectangle…" --voice fr-FR-DeniseNeural --rate -4%
+pip install -U edge-tts
+
+# A) Single narration -> vo.mp3 + vo_words.json + vo.js
+python scripts/vo_gen.py --text "Pourquoi 99 % d'Internet passe sous l'océan ?" --voice fr-FR-DeniseNeural --rate -2%
+
+# B) Multi-scene VO-first pipeline (frame-quantized scene durations, zero cut drift!)
+# scenes.json: [{"id":"hook","narration":"..."},{"id":"proof","narration":"..."}]
+python scripts/vo_gen.py --scenes-json video/scenes.json --voice en-US-AriaNeural --fps 30 --prefix video/vo
 ```
 
-Outputs (prefix `vo` by default):
-- `vo.mp3` — the audio
-- `vo_words.json` — `{ words:[{text,fromMs,toMs}], captions:[{startMs,durationMs,text,tokens[]}] }`
-  where captions are grouped pages of ≤3 words (gap >700ms breaks a page) with per-word windows
-- `vo.js` — `window.VO_B64` (base64 mp3) + `window.VO_DATA` (the JSON), drop-in for a
-  canvas/seek pipeline: `<script src="vo.js">` then `decodeAudioData` for playback and
-  `VO_DATA.captions` for drawing
+### Outputs (`--prefix video/vo`)
+- `video/vo.mp3` — Clean concatenated audio padded to exact integer frame boundaries (`scene_frames / fps`) so `disco.mjs` cuts never drift by ±1 frame.
+- `video/vo_words.json` — Contains:
+  - `scenes[]` (when `--scenes-json` used): `{ id, start, duration, startFrame, durationFrames }` ready to paste into `timeline.json`.
+  - `words[]`: `{ text, fromMs, toMs }` with stripped punctuation restored from source text!
+  - `captions[]`: Smart 3-pass multilingual pages (`{ startMs, durationMs, text, tokens[] }`):
+    - **French**: merges elisions (`l'` + `océan` → `l'océan`, never `L' OCÉAN`) and attaches `? ! : ;` with `\u202F`.
+    - **FR & EN**: backtracks so proclitics (`le`, `de`, `à`, `the`, `of`, `to`) never dangle alone at page end.
+    - **CJK (`zh`, `ja`, `ko`)**: joins without spaces, preserves native characters (no `.upper()`), and respects *Kinsoku* punctuation rules.
+  - `envelope`: `{ fps, rms[], bass[], high[] }` normalized `[0..1]` per video frame — drive audio-reactive pulses/bars deterministically inside `seek(t)`!
+- `video/vo.js` — `window.VO_B64` + `window.VO_DATA` for standalone HTML playback.
 
-List voices: `python scripts/vo_gen.py --list-voices fr` (also: en, ja, es, de, pt, zh, ar…).
+---
 
-## Voice menu (short picks)
+## 2. Recommended Voices & Expressive Tag Hygiene
 
-| Language | Calm narrator | Energetic |
+| Language | Documentary / Editorial | Dynamic / Tech Launch |
 |---|---|---|
-| fr | fr-FR-DeniseNeural | fr-FR-HenriNeural |
-| en | en-US-AriaNeural | en-US-GuyNeural |
-| ja | ja-JP-NanamiNeural | ja-JP-KeitaNeural |
-| es | es-ES-ElviraNeural | es-ES-AlvaroNeural |
-| de | de-DE-KatjaNeural | de-DE-ConradNeural |
-| pt | pt-BR-FranciscaNeural | pt-BR-AntonioNeural |
-| zh | zh-CN-XiaoxiaoNeural | zh-CN-YunjianNeural |
+| `fr` | `fr-FR-DeniseNeural` | `fr-FR-HenriNeural` / `fr-FR-RemyMultilingualNeural` |
+| `en` | `en-US-AriaNeural` / `en-US-BrianMultilingualNeural` | `en-US-AndrewMultilingualNeural` |
+| `zh` | `zh-CN-XiaoxiaoNeural` | `zh-CN-YunxiNeural` |
+| `ja` | `ja-JP-NanamiNeural` | `ja-JP-KeitaNeural` |
+| `ko` | `ko-KR-SunHiNeural` | `ko-KR-InJoonNeural` |
 
-Rate syntax: `--rate -4%` slower / `+10%` faster. Short sentences give cleaner word
-boundaries; regenerate per sentence to redo one bad line without redoing the track.
-
-## Gotchas (learned the hard way)
-
-- **edge-tts ≥ 7**: word boundaries are OFF by default — `boundary="WordBoundary"` is
-  required (vo_gen.py already passes it). Symptom of the bug: audio OK, `words` empty.
-- **HTTP 403 from the service**: your edge-tts is too old for the current token scheme —
-  `pip install -U edge-tts` (use a venv if the system install is locked).
-- Word offsets are in 100-nanosecond units in the raw stream; divide by 10⁴ for ms.
-
-## Alternatives & upgrades
-
-- **Kokoro** (`pip install kokoro`) — local neural TTS, 82M params, several langs.
-- **Piper** — fully offline, fast, per-language voice downloads.
-- **ElevenLabs** — paid, multilingual v2; the `with-timestamps` API returns character-level
-  times that feed captions directly.
-- **VOICEVOX** (Japanese) — local HTTP API at `localhost:50021`, per-phoneme timings
-  (great for JP lip-flap animation).
-- **Any existing audio** → word timings via faster-whisper:
-  ```bash
-  pip install faster-whisper
-  python - <<'EOF'
-  from faster_whisper import WhisperModel; import json
-  m = WhisperModel("small"); segs, _ = m.transcribe("track.mp3", word_timestamps=True)
-  json.dump([w._asdict() for s in segs for w in s.words], open("words.json","w"))
-  EOF
-  ```
-
-## Mixing into a video (quick reference)
-
-Voice, music and SFX as SEPARATE stems, then: music bed −18…−22 LUFS under VO, duck with
-ffmpeg `sidechaincompress` (VO as trigger), final `loudnorm=I=-14:TP=-1.5:LRA=11`.
-Caption style that works: bold caps, 1–3 words per pop, active word in accent color with a
-~20% scale pop, black pill or stroke behind for contrast, kept out of platform UI zones.
+- **Expressive tags**: Inline stage tags like `[short pause]` or `[excited]` (used by Gemini TTS / Fish-Speech / Qwen3-TTS) are automatically stripped by `vo_gen.py` (`strip_tts_tags`) before speaking on Edge-TTS and before building captions.
+- **Forced alignment for external audio** (ElevenLabs, Gemini TTS, Kokoro, recorded human voice): prefer **`stable-ts`** (`stable_whisper.load_faster_whisper('small').align(audio, clean_script)`) over raw `transcribe()` so technical acronyms and numbers are never misspelled in captions.
